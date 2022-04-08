@@ -28,10 +28,10 @@ return require('packer').startup(function(use)
 
   -- snippets
   use "L3MON4D3/LuaSnip" --snippet engine
-  use "rafamadriz/friendly-snippets"
+  use "rafamadriz/friendly-snippets" -- collection of useful snippets
 
   -- language-specific
-  use "Julian/lean.nvim"
+  use "~/lean.nvim"
 
   -- misc
   use "phaazon/hop.nvim"
@@ -40,6 +40,7 @@ return require('packer').startup(function(use)
   use "ur4ltz/surround.nvim"
   use "hkupty/nvimux"
   use "TimUntersberger/neogit"
+  use "folke/lua-dev.nvim"
 
   -- Automatically set up your configuration after cloning packer.nvim
   -- Put this at the end after all plugins

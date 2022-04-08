@@ -117,7 +117,12 @@ _G.packer_plugins = {
   ["lean.nvim"] = {
     loaded = true,
     path = "/home/gcloud/.local/share/nvim/site/pack/packer/start/lean.nvim",
-    url = "https://github.com/Julian/lean.nvim"
+    url = "/home/gcloud/lean.nvim"
+  },
+  ["lua-dev.nvim"] = {
+    loaded = true,
+    path = "/home/gcloud/.local/share/nvim/site/pack/packer/start/lua-dev.nvim",
+    url = "https://github.com/folke/lua-dev.nvim"
   },
   neogit = {
     loaded = true,
