@@ -9,8 +9,8 @@ return require('packer').startup(function(use)
   -- core
   use "wbthomason/packer.nvim" -- Have packer manage itself
   use "nvim-lua/plenary.nvim"
-  use "~/nvim-lspconfig"
   use "williamboman/nvim-lsp-installer"
+  use "~/nvim-lspconfig"
 
   -- buffer management
   use "nvim-telescope/telescope.nvim"
@@ -19,7 +19,7 @@ return require('packer').startup(function(use)
   use "lewis6991/gitsigns.nvim"
 
   -- completion
-  use "hrsh7th/nvim-cmp"
+  use "~/nvim-cmp"
   use "hrsh7th/cmp-nvim-lsp"
   use "hrsh7th/cmp-buffer" -- buffer completions
   use "hrsh7th/cmp-path" -- path completions
@@ -34,8 +34,8 @@ return require('packer').startup(function(use)
   use "~/lean.nvim"
 
   -- misc
-  use "phaazon/hop.nvim"
-  use "akinsho/toggleterm.nvim"
+  use "~/hop.nvim"
+  use "~/toggleterm.nvim"
   use "andymass/vim-matchup"
   use "ur4ltz/surround.nvim"
   use "hkupty/nvimux"

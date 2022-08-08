@@ -42,6 +42,9 @@ require"toggleterm_config"
 
 require"neogit_config"
 
+--require"vim.lsp.log".set_level("debug")
+
+util.nmap("<leader>q", ":qa!<cr>")
 util.nmap("<leader>w", ":w<cr>")
 util.nmap("<leader>c", ":ccl<cr>")
 util.nmap("<leader>xx", ":q<cr>")
@@ -51,14 +54,23 @@ util.nmap("<leader>p", ":set paste<CR>")
 util.nmap("<leader>np", ":set nopaste<CR>")
 util.nmap("<leader>m", ":setlo nomodifiable<CR>")
 util.nmap("<leader>M", ":setlo modifiable<CR>")
+util.nmap("<leader>ll", ":LspInfo<CR>")
+util.nmap("<leader>lr", ":LspRestart<CR>")
+util.nmap("<leader>lR", ":LspRestart!<CR>")
+util.nmap("<leader>ls", ":LspStop<CR>")
+util.nmap("<leader>lS", ":LspStop!<CR>")
+util.nmap("<leader>lt", ":LspStart<CR>")
+util.nmap("<leader>lT", ":LspStart!<CR>")
 
 vim.cmd([[
   autocmd FileType lean3 set shiftwidth=2
   autocmd FileType lean3 set tabstop=2
   autocmd FileType lua set shiftwidth=2
   autocmd FileType lua set tabstop=2
+  autocmd FileType rust set shiftwidth=2
+  autocmd FileType rust set tabstop=2
 
   autocmd TermOpen * setlocal nonumber
-
-  colorscheme peachpuff
+  
+  colorscheme elflord
 ]])

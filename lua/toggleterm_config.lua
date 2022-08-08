@@ -7,7 +7,7 @@ require("toggleterm").setup{
   --    return vim.o.columns * 0.4
   --  end
   --end,
-  open_mapping = [[<c-t>]],
+  open_mapping = [[<c-s>]],
   --on_open = fun(t: Terminal), -- function to run when the terminal opens
   --on_close = fun(t: Terminal), -- function to run when the terminal closes
   --on_stdout = fun(t: Terminal, job: number, data: string[], name: string) -- callback for processing output on stdout
@@ -17,13 +17,16 @@ require("toggleterm").setup{
   --shade_filetypes = {},
   shade_terminals = true,
   shading_factor = '1', -- the degree by which to darken to terminal colour, default: 1 for dark backgrounds, 3 for light
-  --start_in_insert = true,
+  --start_in_insert = false,
   --insert_mappings = true, -- whether or not the open mapping applies in insert mode
   --terminal_mappings = true, -- whether or not the open mapping applies in the opened terminals
   persist_size = false,
+  persist_mode = true,
   direction = 'float',
   --close_on_exit = true, -- close the terminal window when the process exits
   --shell = vim.o.shell, -- change the default shell
+  auto_scroll = false, -- automatically scroll to the bottom on terminal output
+  toggle_strategy = "by_tabpage",
   -- This field is only relevant if direction is set to 'float'
   float_opts = {
     -- The border key is *almost* the same as 'nvim_open_win'
@@ -41,3 +44,11 @@ require("toggleterm").setup{
     }
   }
 }
+
+local toggleterm = require'toggleterm'
+local strategies = toggleterm.toggle_strategies
+local cmd = vim.api.nvim_create_user_command
+
+cmd("TermGitPush", function(opts) toggleterm.exec("git push", opts.count, 12) end, {count = 1})
+cmd("TermGitPushF", function(opts) toggleterm.exec("git push -f", opts.count, 12) end, {count = 1})
+cmd("ToggleTermTab", function(opts) toggleterm.toggle_command(opts.args, strategies["by_tabpage"]()) end, {})

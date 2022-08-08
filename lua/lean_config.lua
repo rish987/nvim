@@ -21,7 +21,7 @@ require('lean').setup{
       -- (comma is a popular choice on French keyboards)
       leader = '\\',
   },
-  ft = { default = "lean3" },
+  ft = { default = "lean" },
   -- Enable suggested mappings?
   --
   -- false by default, true to enable
@@ -32,7 +32,7 @@ require('lean').setup{
       enable = false,
       support_hop = true,
       width = 55,
-      autoopen = true,
+      autoopen = false,
       indicators = "always"
   },
   -- Enable the Lean3(lsp3)/Lean4(lsp) language servers?
@@ -48,6 +48,7 @@ require('lean').setup{
   },
 
   lsp = {
-      on_attach = require"lsp_config".on_attach,
+    on_attach = require"lsp_config".on_attach,
+    capabilities = require('cmp_nvim_lsp').update_capabilities(vim.lsp.protocol.make_client_capabilities())
   }
 }
