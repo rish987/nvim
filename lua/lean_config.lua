@@ -29,11 +29,11 @@ require('lean').setup{
   -- Enable the infauxview?
   infoview = {
       -- Clip the infoview to a maximum width
-      enable = false,
       support_hop = true,
       width = 55,
-      autoopen = false,
-      indicators = "always"
+      autoopen = true,
+      indicators = "always",
+      separate_tab = false
   },
   -- Enable the Lean3(lsp3)/Lean4(lsp) language servers?
   --

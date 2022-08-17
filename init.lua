@@ -1,7 +1,7 @@
 local util = require"config_util"
 
-vim.g.mapleader = "'"
-vim.g.maplocalleader = "''"
+vim.g.mapleader = " "
+vim.g.maplocalleader = "  "
 
 vim.o.completeopt = "menu,menuone,noselect"
 vim.o.hidden = true
@@ -44,7 +44,8 @@ require"neogit_config"
 
 --require"vim.lsp.log".set_level("debug")
 
-util.nmap("<leader>q", ":qa!<cr>")
+util.nmap("<leader>Q", ":qa!<cr>")
+util.nmap("<leader>e", ":edit<cr>")
 util.nmap("<leader>w", ":w<cr>")
 util.nmap("<leader>c", ":ccl<cr>")
 util.nmap("<leader>xx", ":q<cr>")
@@ -61,6 +62,10 @@ util.nmap("<leader>ls", ":LspStop<CR>")
 util.nmap("<leader>lS", ":LspStop!<CR>")
 util.nmap("<leader>lt", ":LspStart<CR>")
 util.nmap("<leader>lT", ":LspStart!<CR>")
+util.nmap("<leader>sc", ":ToggleTermSmartClear<CR>")
+util.nmap("<leader>sl", ":ToggleTermSmartLast<CR>")
+util.nmap("<leader>sn", ":ToggleTermSmartNew<CR>")
+util.nmap("<leader>Tt", ":tabnew")
 
 vim.cmd([[
   autocmd FileType lean3 set shiftwidth=2
