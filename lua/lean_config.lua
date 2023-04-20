@@ -30,9 +30,10 @@ require('lean').setup{
   infoview = {
       -- Clip the infoview to a maximum width
       support_hop = true,
-      width = 55,
+      --width = 120,
+      width = 60,
       autoopen = true,
-      indicators = "always",
+      indicators = "auto",
       separate_tab = false
   },
   -- Enable the Lean3(lsp3)/Lean4(lsp) language servers?
@@ -44,11 +45,24 @@ require('lean').setup{
   lsp3 = {
     cmd = cmd,
     on_attach = require"lsp_config".on_attach,
-    capabilities = require('cmp_nvim_lsp').update_capabilities(vim.lsp.protocol.make_client_capabilities())
+    capabilities = require('cmp_nvim_lsp').default_capabilities(vim.lsp.protocol.make_client_capabilities())
   },
 
   lsp = {
     on_attach = require"lsp_config".on_attach,
-    capabilities = require('cmp_nvim_lsp').update_capabilities(vim.lsp.protocol.make_client_capabilities())
-  }
+    capabilities = require('cmp_nvim_lsp').default_capabilities(vim.lsp.protocol.make_client_capabilities())
+  },
+
+  -- Redirect Lean's stderr messages somehwere (to a buffer by default)   
+  stderr = {
+    enable = true,
+    height = 20,
+    -- a callback which will be called with (multi-line) stderr output    
+    -- e.g., use:                                                         
+    --   on_lines = function(lines) vim.notify(lines) end                 
+    -- if you want to redirect stderr to `vim.notify`.                    
+    -- The default implementation will redirect to a dedicated stderr     
+    -- window.                                                            
+    on_lines = nil,
+  },
 }

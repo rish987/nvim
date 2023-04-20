@@ -42,6 +42,7 @@ vim.keymap.set("n", "<leader>fh", function() builtin.help_tags() end)
 vim.keymap.set("n", "<leader>fc", function() builtin.command_history() end)
 vim.keymap.set("n", "<leader>f/", function() builtin.search_history() end)
 vim.keymap.set("n", "<leader>fo", function() builtin.oldfiles() end)
+vim.keymap.set("n", "<leader>fs", function() builtin.lsp_dynamic_workspace_symbols() end)
 
 -- create a new tab, open oldfiles picker, :tcd to git directory of file, and open a new terminal for the tab
 vim.keymap.set("n", "<leader>Tf", function()
@@ -51,7 +52,7 @@ vim.keymap.set("n", "<leader>Tf", function()
     actions.select_default:enhance({
       post = function(prompt_bufnr)
           gd(prompt_bufnr)
-          vim.cmd"ToggleTermSmartNew"
+          vim.cmd"ToggleTermNew"
           vim.cmd"ToggleTerm"
         end})
     return true

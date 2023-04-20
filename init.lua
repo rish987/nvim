@@ -5,6 +5,7 @@ vim.g.maplocalleader = "  "
 
 vim.o.completeopt = "menu,menuone,noselect"
 vim.o.hidden = true
+vim.o.cursorline = true
 vim.o.hlsearch = true
 vim.o.number = true
 vim.o.cindent = true
@@ -15,6 +16,7 @@ vim.o.jumpoptions = "stack"
 vim.o.softtabstop=4
 vim.o.tabstop=4
 vim.o.shiftwidth=4
+vim.o.mouse = ""
 
 require"plugins"
 
@@ -42,12 +44,16 @@ require"toggleterm_config"
 
 require"neogit_config"
 
+require"winpick_config"
+
+require"resession_config"
+
 --require"vim.lsp.log".set_level("debug")
 
 util.nmap("<leader>Q", ":qa!<cr>")
-util.nmap("<leader>e", ":edit<cr>")
+util.nmap("<leader>E", ":edit<cr>")
 util.nmap("<leader>w", ":w<cr>")
-util.nmap("<leader>c", ":ccl<cr>")
+util.nmap("<leader>cl", ":ccl<cr>")
 util.nmap("<leader>xx", ":q<cr>")
 util.nmap("<leader>L", ":bn<cr>")
 util.nmap("<leader>H", ":bp<cr>")
@@ -62,20 +68,31 @@ util.nmap("<leader>ls", ":LspStop<CR>")
 util.nmap("<leader>lS", ":LspStop!<CR>")
 util.nmap("<leader>lt", ":LspStart<CR>")
 util.nmap("<leader>lT", ":LspStart!<CR>")
-util.nmap("<leader>sc", ":ToggleTermSmartClear<CR>")
-util.nmap("<leader>sl", ":ToggleTermSmartLast<CR>")
-util.nmap("<leader>sn", ":ToggleTermSmartNew<CR>")
-util.nmap("<leader>Tt", ":tabnew")
+util.nmap("<leader>sc", ":ToggleTermContextClear<CR>")
+util.nmap("<leader>sl", ":ToggleTermLast<CR>")
+util.nmap("<leader>sn", ":ToggleTermNew<CR>")
+util.nmap("<leader>Tt", ":tabnew<CR>")
+util.nmap("<leader>pp", ':let @" = join(readfile("/home/gcloud/temp"), "\\n")<CR>')
+util.nmap("<leader>yy", ":call writefile(getreg('\"', 1, 1), \"/home/gcloud/temp\", \"S\")<CR>")
+util.nmap("<leader>cp", ":let @\" = expand(\"%\")<CR>")
 
 vim.cmd([[
   autocmd FileType lean3 set shiftwidth=2
   autocmd FileType lean3 set tabstop=2
+  autocmd FileType lean set nocindent
   autocmd FileType lua set shiftwidth=2
   autocmd FileType lua set tabstop=2
   autocmd FileType rust set shiftwidth=2
   autocmd FileType rust set tabstop=2
 
   autocmd TermOpen * setlocal nonumber
+
+  " Return to last edit position when opening files (You want this!)
+  autocmd BufReadPost *
+       \ if line("'\"") > 0 && line("'\"") <= line("$") |
+       \   exe "normal! g`\"" |
+       \ endif
   
-  colorscheme elflord
+  set termguicolors
+  colorscheme habamax
 ]])

@@ -26,7 +26,9 @@ require("toggleterm").setup{
   --close_on_exit = true, -- close the terminal window when the process exits
   --shell = vim.o.shell, -- change the default shell
   auto_scroll = false, -- automatically scroll to the bottom on terminal output
-  toggle_strategy = "by_tabpage",
+  get_ctx = function()
+    return vim.api.nvim_get_current_tabpage()
+  end,
   -- This field is only relevant if direction is set to 'float'
   float_opts = {
     -- The border key is *almost* the same as 'nvim_open_win'

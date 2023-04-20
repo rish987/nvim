@@ -17,6 +17,7 @@ return require('packer').startup(function(use)
 
   -- git
   use "lewis6991/gitsigns.nvim"
+  use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }
 
   -- completion
   use "~/nvim-cmp"
@@ -40,7 +41,9 @@ return require('packer').startup(function(use)
   use "ur4ltz/surround.nvim"
   use "hkupty/nvimux"
   use "TimUntersberger/neogit"
-  use "folke/lua-dev.nvim"
+  use "folke/neodev.nvim"
+  use "gbrlsnchs/winpick.nvim"
+  use "~/resession.nvim"
 
   -- Automatically set up your configuration after cloning packer.nvim
   -- Put this at the end after all plugins
