@@ -1,11 +1,11 @@
-require "nvim-lsp-installer".setup {}
+require "mason".setup {}
 local lspconfig = require "lspconfig"
 
 require("neodev").setup({
   -- add any options here, or leave empty to use the default settings
 })
 
-local servers = { "sumneko_lua", "rust_analyzer", "clangd", "clojure_lsp" }
+local servers = { "lua_ls", "rust_analyzer", "clangd", "clojure_lsp" }
 for _, server in ipairs(servers) do
   local opts = {}
 

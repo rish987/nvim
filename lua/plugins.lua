@@ -9,7 +9,10 @@ return require('packer').startup(function(use)
   -- core
   use "wbthomason/packer.nvim" -- Have packer manage itself
   use "nvim-lua/plenary.nvim"
-  use "williamboman/nvim-lsp-installer"
+  use {
+    "williamboman/mason.nvim",
+    run = ":MasonUpdate" -- :MasonUpdate updates registry contents
+  }
   use "~/nvim-lspconfig"
 
   -- buffer management
