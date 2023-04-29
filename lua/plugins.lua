@@ -5,6 +5,11 @@ if fn.empty(fn.glob(install_path)) > 0 then
   packer_bootstrap = fn.system({'git', 'clone', '--depth', '1', 'https://github.com/wbthomason/packer.nvim', install_path})
 end
 
+-- Put this at the end after all plugins
+if packer_bootstrap then
+  require('packer').sync()
+end
+
 return require('packer').startup(function(use)
   -- core
   use "wbthomason/packer.nvim" -- Have packer manage itself
@@ -38,10 +43,13 @@ return require('packer').startup(function(use)
   use "~/lean.nvim"
 
   -- misc
-  use "~/hop.nvim"
+  --use "~/hop.nvim"
+  use "~/leap.nvim"
+  use "ggandor/flit.nvim"
   use "~/toggleterm.nvim"
   use "andymass/vim-matchup"
-  use "ur4ltz/surround.nvim"
+  use "kylechui/nvim-surround"
+  --use "ur4ltz/surround.nvim"
   use "hkupty/nvimux"
   use "TimUntersberger/neogit"
   use "folke/neodev.nvim"
