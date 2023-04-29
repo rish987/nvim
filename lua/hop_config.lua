@@ -1,4 +1,5 @@
-local util = require"config_util"
+--local util = require"config_util"
+
 require('leap').add_default_mappings()
 
 local function get_line_starts(winid, forward, empty, beginning)
@@ -40,14 +41,6 @@ local function get_line_starts(winid, forward, empty, beginning)
   if #targets >= 1 then
     return targets
   end
-end
-
-local function leap_to_line_start()
-  local winid = vim.api.nvim_get_current_win()
-  require('leap').leap {
-    target_windows = { winid },
-    targets = get_line_starts(winid),
-  }
 end
 
 local function leap_to_line(forward, empty, beginning)

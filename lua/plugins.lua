@@ -10,51 +10,91 @@ if packer_bootstrap then
   require('packer').sync()
 end
 
+function Set (list)
+  local set = {}
+  for _, l in ipairs(list) do set[l] = true end
+  return set
+end
+
+local localized_repos =
+Set {
+"nvim-lspconfig",
+"nvim-cmp",
+"lean.nvim",
+"leap.nvim",
+"toggleterm.nvim",
+"resession.nvim",
+}
+
 return require('packer').startup(function(use)
+  -- set to true when using local development repos
+  local use_local = true
+
+  local my_use = function(arg)
+    local is_table = type(arg) == "table"
+
+    local path = is_table and arg[1] or arg
+    local split_path = vim.fn.split(path, "/")
+
+    local author = split_path[1]
+    local repo = split_path[2]
+
+    local prefix = use_local and localized_repos[repo] and "~" or author
+    path = prefix .. "/" .. repo
+
+    if is_table then
+      arg[1] = path
+    else
+      arg = path
+    end
+
+    return use(arg)
+  end
+
   -- core
-  use "wbthomason/packer.nvim" -- Have packer manage itself
-  use "nvim-lua/plenary.nvim"
-  use {
+  my_use "wbthomason/packer.nvim" -- Have packer manage itself
+  my_use "nvim-lua/plenary.nvim"
+  my_use {
     "williamboman/mason.nvim",
     run = ":MasonUpdate" -- :MasonUpdate updates registry contents
   }
-  use "~/nvim-lspconfig"
+  my_use "neovim/nvim-lspconfig"
 
   -- buffer management
-  use "nvim-telescope/telescope.nvim"
+  my_use "nvim-telescope/telescope.nvim"
 
   -- git
-  use "lewis6991/gitsigns.nvim"
-  use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }
+  my_use "lewis6991/gitsigns.nvim"
+  my_use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }
 
   -- completion
-  use "~/nvim-cmp"
-  use "hrsh7th/cmp-nvim-lsp"
-  use "hrsh7th/cmp-buffer" -- buffer completions
-  use "hrsh7th/cmp-path" -- path completions
-  use "hrsh7th/cmp-cmdline" -- cmdline completions
-  use "saadparwaiz1/cmp_luasnip" -- snippet completions
+  my_use "hrsh7th/nvim-cmp"
+  my_use "hrsh7th/cmp-nvim-lsp"
+  my_use "hrsh7th/cmp-buffer" -- buffer completions
+  my_use "hrsh7th/cmp-path" -- path completions
+  my_use "hrsh7th/cmp-cmdline" -- cmdline completions
+  my_use "saadparwaiz1/cmp_luasnip" -- snippet completions
 
   -- snippets
-  use "L3MON4D3/LuaSnip" --snippet engine
-  use "rafamadriz/friendly-snippets" -- collection of useful snippets
+  my_use "L3MON4D3/LuaSnip" --snippet engine
+  my_use "rafamadriz/friendly-snippets" -- collection of my_useful snippets
 
   -- language-specific
-  use "~/lean.nvim"
+  my_use "Julian/lean.nvim"
 
   -- misc
-  --use "~/hop.nvim"
-  use "~/leap.nvim"
-  use "ggandor/flit.nvim"
-  use "~/toggleterm.nvim"
-  use "andymass/vim-matchup"
-  use "kylechui/nvim-surround"
-  --use "ur4ltz/surround.nvim"
-  use "hkupty/nvimux"
-  use "TimUntersberger/neogit"
-  use "folke/neodev.nvim"
-  use "gbrlsnchs/winpick.nvim"
-  use "~/resession.nvim"
+  --my_use "Phaazon/hop.nvim"
+  my_use "ggandor/leap.nvim"
+  my_use "ggandor/flit.nvim"
+  my_use "akinsho/toggleterm.nvim"
+  my_use "andymass/vim-matchup"
+  my_use "kylechui/nvim-surround"
+  --my_use "ur4ltz/surround.nvim"
+  my_use "hkupty/nvimux"
+  my_use "TimUntersberger/neogit"
+  my_use "folke/neodev.nvim"
+  my_use "gbrlsnchs/winpick.nvim"
+  my_use "stevearc/resession.nvim"
 
   -- Automatically set up your configuration after cloning packer.nvim
   -- Put this at the end after all plugins
