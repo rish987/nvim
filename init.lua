@@ -48,6 +48,8 @@ require"winpick_config"
 
 require"resession_config"
 
+require"tabby_config"
+
 --require"vim.lsp.log".set_level("debug")
 
 util.nmap("<leader>Q", ":qa!<cr>")

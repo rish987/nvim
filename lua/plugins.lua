@@ -98,6 +98,7 @@ return require('packer').startup(function(use)
   my_use "folke/neodev.nvim"
   my_use "gbrlsnchs/winpick.nvim"
   my_use "stevearc/resession.nvim"
+  my_use 'nanozuki/tabby.nvim'
 
   -- Automatically set up your configuration after cloning packer.nvim
   -- Put this at the end after all plugins
