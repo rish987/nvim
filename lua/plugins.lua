@@ -63,6 +63,9 @@ return require('packer').startup(function(use)
   -- buffer management
   my_use "nvim-telescope/telescope.nvim"
 
+  -- telescope extensions
+  my_use "jvgrootveld/telescope-zoxide"
+
   -- git
   my_use "lewis6991/gitsigns.nvim"
   my_use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }

@@ -58,3 +58,32 @@ vim.keymap.set("n", "<leader>Tf", function()
     return true
   end
 }) end)
+
+local z_utils = require("telescope._extensions.zoxide.utils")
+
+-- Configure the extension
+telescope.setup({
+  extensions = {
+    zoxide = {
+      mappings = {
+        default = {
+          action = function(selection)
+            vim.cmd.tcd(selection.path)
+          end
+        },
+        ["<C-t>"] = {
+          action = function(selection)
+            vim.cmd.tabnew()
+            vim.cmd.tcd(selection.path)
+          end,
+        },
+      },
+    },
+  },
+})
+
+-- Load the extension
+telescope.load_extension('zoxide')
+
+-- Add a mapping
+vim.keymap.set("n", "<leader>fz", telescope.extensions.zoxide.list)
