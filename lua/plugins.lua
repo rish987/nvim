@@ -60,11 +60,11 @@ return require('packer').startup(function(use)
   }
   my_use "neovim/nvim-lspconfig"
 
-  -- buffer management
+  -- navigation
   my_use "nvim-telescope/telescope.nvim"
-
-  -- telescope extensions
-  my_use "jvgrootveld/telescope-zoxide"
+    -- telescope extensions
+    my_use "jvgrootveld/telescope-zoxide"
+    my_use "LukasPietzschmann/telescope-tabs"
 
   -- git
   my_use "lewis6991/gitsigns.nvim"
@@ -86,13 +86,11 @@ return require('packer').startup(function(use)
   my_use "Julian/lean.nvim"
 
   -- misc
-  --my_use "Phaazon/hop.nvim"
   my_use "ggandor/leap.nvim"
   my_use "ggandor/flit.nvim"
   my_use "akinsho/toggleterm.nvim"
   my_use "andymass/vim-matchup"
   my_use "kylechui/nvim-surround"
-  --my_use "ur4ltz/surround.nvim"
   my_use "hkupty/nvimux"
   my_use "TimUntersberger/neogit"
   my_use "folke/neodev.nvim"

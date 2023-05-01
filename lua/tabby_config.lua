@@ -7,6 +7,7 @@ local theme = {
   win = 'TabLine',
   tail = 'TabLine',
 }
+
 --require('tabby.tabline').set(function(line)
 --    local cwd = ' ' .. vim.fn.fnamemodify(vim.fn.getcwd(), ':t') .. ' '
 --    return {
@@ -17,6 +18,12 @@ local theme = {
 --        ".....",
 --    }
 --end, {})
+
+local function get_tab_name(tabid)
+  local cwd = ' ' .. vim.fn.fnamemodify(vim.fn.getcwd(0, tabid), ':t') .. ' '
+  return cwd
+end
+
 require('tabby.tabline').set(function(line)
   return {
     {
@@ -24,6 +31,7 @@ require('tabby.tabline').set(function(line)
       line.sep('|', theme.head, theme.fill),
     },
     line.tabs().foreach(function(tab)
+      require("tabby.feature.tab_name").set(tab.id, get_tab_name(tab.id))
       local hl = tab.is_current() and theme.current_tab or theme.tab
       return {
         line.sep('|', hl, theme.fill),
@@ -55,14 +63,12 @@ require('tabby.tabline').set(function(line)
   }
 end,
 {
-    tab_name = {
-        name_fallback = function(tabid)
-            local cwd = ' ' .. vim.fn.fnamemodify(vim.fn.getcwd(0, tabid), ':t') .. ' '
-            return cwd
-        end
-    },
-    buf_name = {
-        mode = "shorten",
-    }
+  tab_name = {
+    name_fallback = get_tab_name
+  },
+  buf_name = {
+      mode = "shorten",
+  }
 }
+
 )
