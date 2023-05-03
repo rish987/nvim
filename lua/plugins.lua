@@ -28,7 +28,7 @@ Set {
 
 return require('packer').startup(function(use)
   -- set to true when using local development repos
-  local use_local = true
+  local use_local = false
 
   local my_use = function(arg)
     local is_table = type(arg) == "table"
@@ -97,6 +97,11 @@ return require('packer').startup(function(use)
   my_use "gbrlsnchs/winpick.nvim"
   my_use "stevearc/resession.nvim"
   my_use 'nanozuki/tabby.nvim'
+  my_use {
+    'glacambre/firenvim',
+    run = function() vim.fn['firenvim#install'](0) end
+  }
+
 
   -- Automatically set up your configuration after cloning packer.nvim
   -- Put this at the end after all plugins
