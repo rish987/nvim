@@ -52,6 +52,8 @@ require"tabby_config"
 
 require"firenvim_config"
 
+require"vimtex_config"
+
 --require"vim.lsp.log".set_level("debug")
 
 util.nmap("<leader>Q", ":qa!<cr>")
@@ -59,19 +61,11 @@ util.nmap("<leader>E", ":edit<cr>")
 util.nmap("<leader>w", ":w<cr>")
 util.nmap("<leader>cl", ":ccl<cr>")
 util.nmap("<leader>xx", ":q<cr>")
-util.nmap("<leader>L", ":bn<cr>")
-util.nmap("<leader>H", ":bp<cr>")
 util.nmap("<leader>p", ":set paste<CR>")
 util.nmap("<leader>np", ":set nopaste<CR>")
 util.nmap("<leader>m", ":setlo nomodifiable<CR>")
 util.nmap("<leader>M", ":setlo modifiable<CR>")
-util.nmap("<leader>ll", ":LspInfo<CR>")
-util.nmap("<leader>lr", ":LspRestart<CR>")
-util.nmap("<leader>lR", ":LspRestart!<CR>")
-util.nmap("<leader>ls", ":LspStop<CR>")
-util.nmap("<leader>lS", ":LspStop!<CR>")
-util.nmap("<leader>lt", ":LspStart<CR>")
-util.nmap("<leader>lT", ":LspStart!<CR>")
+util.nmap("<leader>L", ":LspInfo<CR>")
 util.nmap("<leader>sc", ":ToggleTermContextClear<CR>")
 util.nmap("<leader>sl", ":ToggleTermLast<CR>")
 util.nmap("<leader>sn", ":ToggleTermNew<CR>")

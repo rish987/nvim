@@ -28,7 +28,7 @@ Set {
 
 return require('packer').startup(function(use)
   -- set to true when using local development repos
-  local use_local = false
+  local use_local = true
 
   local my_use = function(arg)
     local is_table = type(arg) == "table"
@@ -84,6 +84,7 @@ return require('packer').startup(function(use)
 
   -- language-specific
   my_use "Julian/lean.nvim"
+  my_use "lervag/vimtex"
 
   -- misc
   my_use "ggandor/leap.nvim"
