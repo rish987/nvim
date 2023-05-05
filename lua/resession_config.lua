@@ -8,7 +8,7 @@ resession.setup({
   -- good periodically save your sessions for the time being since this plugin tends to freeze
   -- while editing Lean 4 files :(
   autosave = {
-    enabled = true,
+    enabled = false,
     interval = 60,
     notify = false,
   },

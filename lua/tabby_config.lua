@@ -20,7 +20,7 @@ local theme = {
 --end, {})
 
 local function get_tab_name(tabid)
-  local cwd = ' ' .. vim.fn.fnamemodify(vim.fn.getcwd(0, tabid), ':t') .. ' '
+  local cwd = ' ' .. vim.fn.fnamemodify(vim.fn.getcwd(0, vim.api.nvim_tabpage_get_number(tabid)), ':t') .. ' '
   return cwd
 end
 
