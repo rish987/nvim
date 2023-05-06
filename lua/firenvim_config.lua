@@ -22,10 +22,10 @@ vim.api.nvim_create_autocmd({'TextChanged', 'TextChangedI'}, {
 })
 
 -- FIXME does not work
-vim.api.nvim_create_autocmd('BufEnter', {
-    pattern = "www.google.com_.*.txt",
-    command = [[inoremap <CR> <Esc>:w<CR>:call firenvim#press_keys("<LT>CR>")<CR>]],
-})
+--vim.api.nvim_create_autocmd('BufEnter', {
+--    pattern = "www.google.com_.*.txt",
+--    command = [[inoremap <CR> <Esc>:w<CR>:call firenvim#press_keys("<LT>CR>")<CR>]],
+--})
 
 vim.g.firenvim_config = {
   globalSettings = {
@@ -50,3 +50,6 @@ vim.g.firenvim_config = {
     }
   }
 }
+
+vim.o.spell = true
+vim.o.spelllang = "en_us"

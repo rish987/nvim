@@ -100,6 +100,7 @@ vim.cmd([[
        \ endif
   
   set termguicolors
+  set guifont=DejaVuSansM\ Nerd\ Font\ Mono:h8:i
 
   nnoremap gp `[v`]
 ]])
