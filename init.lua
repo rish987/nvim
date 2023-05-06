@@ -54,6 +54,8 @@ require"firenvim_config"
 
 require"vimtex_config"
 
+require"neoscroll_config"
+
 --require"vim.lsp.log".set_level("debug")
 
 util.nmap("<leader>Q", ":qa!<cr>")

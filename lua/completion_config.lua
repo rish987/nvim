@@ -26,6 +26,10 @@ cmp.setup({
     { name = 'luasnip' },
     { name = 'buffer' },
     { name = 'path' },
+    --{
+    --  name = "dictionary",
+    --  keyword_length = 2,
+    --},
   }),
   experimental = {
     ghost_text = true -- this feature conflict with copilot.vim's preview.
@@ -47,3 +51,34 @@ cmp.setup.cmdline(':', {
     { name = 'cmdline' }
   })
 })
+
+--local dict = require("cmp_dictionary")
+--
+--dict.setup({
+--  exact = 1,
+--  first_case_insensitive = true,
+--  document = false,
+--  document_command = "wn %s -over",
+--  async = true,
+--  sqlite = false,
+--  max_items = -1,
+--  capacity = 5,
+--  debug = false,
+--})
+--
+--dict.switcher({
+--  filetype = {
+--    --lua = "/path/to/lua.dict",
+--    --javascript = { "/path/to/js.dict", "/path/to/js2.dict" },
+--    --txt = "/usr/share/dict/en.dict",
+--    --md = "/usr/share/dict/en.dict",
+--    --tex = "/usr/share/dict/en.dict",
+--  },
+--  filepath = {
+--    --[".*xmake.lua"] = { "/path/to/xmake.dict", "/path/to/lua.dict" },
+--    --["%.tmux.*%.conf"] = { "/path/to/js.dict", "/path/to/js2.dict" },
+--  },
+--  spelllang = {
+--    en = "/usr/share/dict/words",
+--  },
+--})

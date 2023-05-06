@@ -79,6 +79,7 @@ return require('packer').startup(function(use)
   my_use "hrsh7th/cmp-path" -- path completions
   my_use "hrsh7th/cmp-cmdline" -- cmdline completions
   my_use "saadparwaiz1/cmp_luasnip" -- snippet completions
+  my_use "uga-rosa/cmp-dictionary" -- dictionary completions
 
   -- snippets
   use { "L3MON4D3/LuaSnip", run = "make install_jsregexp" }
@@ -105,6 +106,7 @@ return require('packer').startup(function(use)
     run = function() vim.fn['firenvim#install'](0) end
   }
   my_use { "catppuccin/nvim", as = "catppuccin" }
+  my_use 'karb94/neoscroll.nvim'
 
 
   -- Automatically set up your configuration after cloning packer.nvim
