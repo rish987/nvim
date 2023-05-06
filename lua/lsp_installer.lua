@@ -21,7 +21,7 @@ for _, server in ipairs(servers) do
     }
   end
   opts.on_attach = require "lsp_config".on_attach
-  opts.capabilities = require('cmp_nvim_lsp').default_capabilities(vim.lsp.protocol.make_client_capabilities())
+  opts.capabilities = require('cmp_nvim_lsp').default_capabilities()
 
   lspconfig[server].setup(opts)
 end

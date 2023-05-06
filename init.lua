@@ -74,6 +74,8 @@ util.nmap("<leader>pp", ':let @" = join(readfile("/home/gcloud/temp"), "\\n")<CR
 util.nmap("<leader>yy", ":call writefile(getreg('\"', 1, 1), \"/home/gcloud/temp\", \"S\")<CR>")
 util.nmap("<leader>cp", ":let @\" = expand(\"%\")<CR>")
 
+vim.cmd.colorscheme "catppuccin"
+
 vim.cmd([[
   autocmd FileType lean3 set shiftwidth=2
   autocmd FileType lean3 set tabstop=2
@@ -82,6 +84,8 @@ vim.cmd([[
   autocmd FileType lua set tabstop=2
   autocmd FileType rust set shiftwidth=2
   autocmd FileType rust set tabstop=2
+  autocmd FileType tex set shiftwidth=2
+  autocmd FileType tex set tabstop=2
 
   autocmd TermOpen * setlocal nonumber
 
@@ -92,5 +96,6 @@ vim.cmd([[
        \ endif
   
   set termguicolors
-  colorscheme habamax
+
+  nnoremap gp `[v`]
 ]])

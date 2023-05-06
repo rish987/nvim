@@ -24,6 +24,8 @@ Set {
 "leap.nvim",
 "toggleterm.nvim",
 "resession.nvim",
+"friendly-snippets",
+"LuaSnip",
 }
 
 return require('packer').startup(function(use)
@@ -79,7 +81,7 @@ return require('packer').startup(function(use)
   my_use "saadparwaiz1/cmp_luasnip" -- snippet completions
 
   -- snippets
-  my_use "L3MON4D3/LuaSnip" --snippet engine
+  use { "L3MON4D3/LuaSnip", run = "make install_jsregexp" }
   my_use "rafamadriz/friendly-snippets" -- collection of my_useful snippets
 
   -- language-specific
@@ -102,6 +104,7 @@ return require('packer').startup(function(use)
     'glacambre/firenvim',
     run = function() vim.fn['firenvim#install'](0) end
   }
+  my_use { "catppuccin/nvim", as = "catppuccin" }
 
 
   -- Automatically set up your configuration after cloning packer.nvim

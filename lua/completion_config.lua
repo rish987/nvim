@@ -1,5 +1,3 @@
---require("luasnip.loaders.from_vscode").load()
-
 -- Setup nvim-cmp.
 local cmp = require'cmp'
 
@@ -21,14 +19,17 @@ cmp.setup({
       i = cmp.mapping.abort(),
       c = cmp.mapping.close(),
     }),
-    ['<C-l>'] = cmp.mapping.confirm({ select = true }), -- Accept currently selected item. Set `select` to `false` to only confirm explicitly selected items.
+    ['<CR>'] = cmp.mapping.confirm({ select = true }), -- Accept currently selected item. Set `select` to `false` to only confirm explicitly selected items.
   },
   sources = cmp.config.sources({
     { name = 'nvim_lsp' },
     { name = 'luasnip' },
     { name = 'buffer' },
     { name = 'path' },
-  })
+  }),
+  experimental = {
+    ghost_text = true -- this feature conflict with copilot.vim's preview.
+  }
 })
 
 -- Use buffer source for `/` (if you enabled `native_menu`, this won't work anymore).
