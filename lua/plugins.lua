@@ -67,6 +67,8 @@ return require('packer').startup(function(use)
     -- telescope extensions
     my_use "jvgrootveld/telescope-zoxide"
     my_use "LukasPietzschmann/telescope-tabs"
+  my_use "ggandor/leap.nvim"
+  my_use "ggandor/flit.nvim"
 
   -- git
   my_use "lewis6991/gitsigns.nvim"
@@ -89,9 +91,15 @@ return require('packer').startup(function(use)
   my_use "Julian/lean.nvim"
   my_use "lervag/vimtex"
 
+  -- UI
+  my_use 'nanozuki/tabby.nvim'
+  my_use { "catppuccin/nvim", as = "catppuccin" }
+  my_use {
+    'nvim-lualine/lualine.nvim',
+    requires = { 'nvim-tree/nvim-web-devicons', opt = true }
+  }
+
   -- misc
-  my_use "ggandor/leap.nvim"
-  my_use "ggandor/flit.nvim"
   my_use "akinsho/toggleterm.nvim"
   my_use "andymass/vim-matchup"
   my_use "kylechui/nvim-surround"
@@ -100,12 +108,10 @@ return require('packer').startup(function(use)
   my_use "folke/neodev.nvim"
   my_use "gbrlsnchs/winpick.nvim"
   my_use "stevearc/resession.nvim"
-  my_use 'nanozuki/tabby.nvim'
   my_use {
     'glacambre/firenvim',
     run = function() vim.fn['firenvim#install'](0) end
   }
-  my_use { "catppuccin/nvim", as = "catppuccin" }
   my_use 'karb94/neoscroll.nvim'
 
 
