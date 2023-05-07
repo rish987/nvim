@@ -18,14 +18,15 @@ end
 
 local localized_repos =
 Set {
-"nvim-lspconfig",
-"nvim-cmp",
-"lean.nvim",
-"leap.nvim",
-"toggleterm.nvim",
-"resession.nvim",
-"friendly-snippets",
-"LuaSnip",
+  "nvim-lspconfig",
+  "nvim-cmp",
+  "lean.nvim",
+  "leap.nvim",
+  "toggleterm.nvim",
+  "resession.nvim",
+  "friendly-snippets",
+  "LuaSnip",
+  "telescope.nvim",
 }
 
 return require('packer').startup(function(use)

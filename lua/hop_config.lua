@@ -51,12 +51,12 @@ local function leap_to_line(forward, empty, beginning)
   }
 end
 
-vim.keymap.set("n", "zk", function () return leap_to_line(false, false, true) end)
-vim.keymap.set("n", "zj", function () return leap_to_line(true, false, true) end)
-vim.keymap.set("n", "Zk", function () return leap_to_line(false, false, false) end)
-vim.keymap.set("n", "Zj", function () return leap_to_line(true, false, false) end)
-vim.keymap.set("n", "zK", function () return leap_to_line(false, true, true) end)
-vim.keymap.set("n", "zJ", function () return leap_to_line(true, true, true) end)
+vim.keymap.set({"n", "v"}, "zk", function () return leap_to_line(false, false, true) end)
+vim.keymap.set({"n", "v"}, "zj", function () return leap_to_line(true, false, true) end)
+vim.keymap.set({"n", "v"}, "Zk", function () return leap_to_line(false, false, false) end)
+vim.keymap.set({"n", "v"}, "Zj", function () return leap_to_line(true, false, false) end)
+vim.keymap.set({"n", "v"}, "zK", function () return leap_to_line(false, true, true) end)
+vim.keymap.set({"n", "v"}, "zJ", function () return leap_to_line(true, true, true) end)
 
 --require"hop".setup({
 --  keys = 'asdfjklrughqwetyiopzxcvbnm'
