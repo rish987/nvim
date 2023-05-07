@@ -92,6 +92,9 @@ return require('packer').startup(function(use)
   my_use "Julian/lean.nvim"
   my_use "lervag/vimtex"
 
+  -- syntax highlighting
+  my_use "bakpakin/fennel.vim"
+
   -- UI
   my_use 'nanozuki/tabby.nvim'
   my_use { "catppuccin/nvim", as = "catppuccin" }

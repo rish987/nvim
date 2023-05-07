@@ -51,10 +51,15 @@ local function leap_to_line(forward, empty, beginning)
   }
 end
 
+-- leap backwards/forwards to line start
 vim.keymap.set({"n", "v"}, "zk", function () return leap_to_line(false, false, true) end)
 vim.keymap.set({"n", "v"}, "zj", function () return leap_to_line(true, false, true) end)
+
+-- leap backwards/forwards to line end
 vim.keymap.set({"n", "v"}, "Zk", function () return leap_to_line(false, false, false) end)
 vim.keymap.set({"n", "v"}, "Zj", function () return leap_to_line(true, false, false) end)
+
+-- leap backwards/forwards to empty lines
 vim.keymap.set({"n", "v"}, "zK", function () return leap_to_line(false, true, true) end)
 vim.keymap.set({"n", "v"}, "zJ", function () return leap_to_line(true, true, true) end)
 

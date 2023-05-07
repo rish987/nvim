@@ -1,7 +1,7 @@
 local util = require"config_util"
-local telescope = require("telescope")
 local builtin = require("telescope.builtin")
-local actions = require("telescope.actions")
+local telescope = require "telescope"
+local actions = require "telescope.actions"
 local action_state = require "telescope.actions.state"
 
 require("telescope-tabs").setup {
@@ -14,9 +14,52 @@ require("telescope-tabs").setup {
     end
 }
 
+local function get_telescope_targets(prompt_bufnr)
+  local pick = action_state.get_current_picker(prompt_bufnr)
+  local scroller = require "telescope.pickers.scroller"
+
+  local wininfo = vim.fn.getwininfo(pick.results_win)
+
+  local first = math.max(scroller.top(pick.sorting_strategy, pick.max_results, pick.manager:num_results()), wininfo[1].topline - 1)
+  local last = wininfo[1].botline - 1
+
+  local targets = {}
+  for row=last,first,-1 do
+    local target = {
+      wininfo = wininfo[1],
+      pos = {row + 1, 1},
+      row = row,
+      pick = pick
+    }
+    table.insert(targets, target)
+  end
+  return targets
+end
+
 telescope.setup {
   defaults = {
     -- ....
+      mappings = {
+        n = {
+          ["S"] = function (prompt_bufnr)
+            require('leap').leap {
+              targets = get_telescope_targets(prompt_bufnr),
+              action = function (target)
+                target.pick:set_selection(target.row)
+              end
+            }
+          end,
+          ["s"] = function (prompt_bufnr)
+            require('leap').leap {
+              targets = get_telescope_targets(prompt_bufnr),
+              action = function (target)
+                target.pick:set_selection(target.row)
+                actions.select_default(prompt_bufnr)
+              end
+            }
+          end
+        }
+      }
   },
   pickers = {
     oldfiles = {

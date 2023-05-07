@@ -79,6 +79,7 @@ util.nmap("<leader>Tt", ":tabnew<CR>")
 util.nmap("<leader>pp", ':let @" = join(readfile("/home/gcloud/temp"), "\\n")<CR>')
 util.nmap("<leader>yy", ":call writefile(getreg('\"', 1, 1), \"/home/gcloud/temp\", \"S\")<CR>")
 util.nmap("<leader>cp", ":let @\" = expand(\"%\")<CR>")
+util.nmap("<leader>o", ":mes<CR>")
 
 vim.cmd.colorscheme "catppuccin"
 
