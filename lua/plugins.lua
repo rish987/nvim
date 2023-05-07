@@ -114,6 +114,7 @@ return require('packer').startup(function(use)
     run = function() vim.fn['firenvim#install'](0) end
   }
   my_use 'karb94/neoscroll.nvim'
+  my_use 'windwp/nvim-autopairs'
 
 
   -- Automatically set up your configuration after cloning packer.nvim

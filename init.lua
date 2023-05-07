@@ -58,6 +58,8 @@ require"neoscroll_config"
 
 require"lualine_config"
 
+require"autopairs_config"
+
 --require"vim.lsp.log".set_level("debug")
 
 util.nmap("<leader>Q", ":qa!<cr>")
