@@ -27,6 +27,7 @@ Set {
   "friendly-snippets",
   "LuaSnip",
   "telescope.nvim",
+  "qf.nvim",
 }
 
 return require('packer').startup(function(use)
@@ -118,7 +119,9 @@ return require('packer').startup(function(use)
   }
   my_use 'karb94/neoscroll.nvim'
   my_use 'windwp/nvim-autopairs'
-
+  --my_use 'ten3roberts/qf.nvim'
+  my_use 'numToStr/Comment.nvim'
+  my_use 'nvim-tree/nvim-tree.lua'
 
   -- Automatically set up your configuration after cloning packer.nvim
   -- Put this at the end after all plugins

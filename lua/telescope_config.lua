@@ -5,13 +5,13 @@ local actions = require "telescope.actions"
 local action_state = require "telescope.actions.state"
 
 require("telescope-tabs").setup {
-    entry_formatter = function(tab_id, buffer_ids, file_names, file_paths, is_current)
-        local tab_name = require("tabby.feature.tab_name").get(tab_id)
-        return string.format("%d: %s%s ", tab_id, tab_name, is_current and " <" or "")
-    end,
-    entry_ordinal = function(tab_id, buffer_ids, file_names, file_paths, is_current)
-       return require("tabby.feature.tab_name").get(tab_id)
-    end
+  entry_formatter = function(tab_id, buffer_ids, file_names, file_paths, is_current)
+    local tab_name = require("tabby.feature.tab_name").get(tab_id)
+    return string.format("%d: %s%s ", tab_id, tab_name, is_current and " <" or "")
+  end,
+  entry_ordinal = function(tab_id, buffer_ids, file_names, file_paths, is_current)
+    return require("tabby.feature.tab_name").get(tab_id)
+  end
 }
 
 local function get_telescope_targets(prompt_bufnr)
@@ -38,28 +38,29 @@ end
 
 telescope.setup {
   defaults = {
-    -- ....
-      mappings = {
-        n = {
-          ["S"] = function (prompt_bufnr)
-            require('leap').leap {
-              targets = get_telescope_targets(prompt_bufnr),
-              action = function (target)
-                target.pick:set_selection(target.row)
-              end
-            }
-          end,
-          ["s"] = function (prompt_bufnr)
-            require('leap').leap {
-              targets = get_telescope_targets(prompt_bufnr),
-              action = function (target)
-                target.pick:set_selection(target.row)
-                actions.select_default(prompt_bufnr)
-              end
-            }
-          end
-        }
+    mappings = {
+      n = {
+        ["K"] = actions.select_default,
+        ["S"] = function (prompt_bufnr)
+          require('leap').leap {
+            targets = get_telescope_targets(prompt_bufnr),
+            action = function (target)
+              target.pick:set_selection(target.row)
+            end
+          }
+        end,
+        ["s"] = function (prompt_bufnr)
+          require('leap').leap {
+            targets = get_telescope_targets(prompt_bufnr),
+            action = function (target)
+              target.pick:set_selection(target.row)
+              actions.select_default(prompt_bufnr)
+            end
+          }
+        end
       }
+    },
+    initial_mode = "normal"
   },
   pickers = {
     oldfiles = {
@@ -95,7 +96,7 @@ vim.keymap.set("n", "<leader>ff", function() builtin.find_files() end)
 vim.keymap.set("n", "<leader>fg", function() builtin.live_grep() end)
 vim.keymap.set("n", "<leader>fb", function() builtin.buffers() end)
 vim.keymap.set("n", "<leader>fh", function() builtin.help_tags() end)
-vim.keymap.set("n", "<leader>fc", function() builtin.command_history() end)
+vim.keymap.set("n", "<leader>f:", function() builtin.command_history() end)
 vim.keymap.set("n", "<leader>f/", function() builtin.search_history() end)
 vim.keymap.set("n", "<leader>fo", function() builtin.oldfiles() end)
 vim.keymap.set("n", "<leader>fs", function() builtin.lsp_dynamic_workspace_symbols() end)

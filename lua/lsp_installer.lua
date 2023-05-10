@@ -9,6 +9,16 @@ local servers = { "lua_ls", "rust_analyzer", "clangd", "clojure_lsp", "texlab", 
 for _, server in ipairs(servers) do
   local opts = {}
 
+  if server == "lua_ls" then
+    opts.settings = {
+      Lua = {
+        completion = {
+          callSnippet = 'Replace',
+        },
+      },
+    }
+  end
+
   opts.on_attach = require "lsp_config".on_attach
   opts.capabilities = require('cmp_nvim_lsp').default_capabilities()
 

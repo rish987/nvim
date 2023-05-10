@@ -1,7 +1,14 @@
 local util = require"config_util"
 
+-- disable netrw
+vim.g.loaded_netrw = 1
+vim.g.loaded_netrwPlugin = 1
+
 vim.g.mapleader = " "
 vim.g.maplocalleader = "  "
+
+-- set termguicolors to enable highlight groups
+vim.o.termguicolors = true
 
 vim.o.completeopt = "menu,menuone,noselect"
 vim.o.hidden = true
@@ -60,6 +67,29 @@ require"lualine_config"
 
 require"autopairs_config"
 
+--require"qf_config"
+
+require"comment_config"
+
+require"tree_config"
+
+local au = function(events, callback, opts)
+  opts = opts or {}
+  opts.callback = callback
+  vim.api.nvim_create_autocmd(events, opts)
+end
+
+-- -- auto-close quickfix/location after leaving it
+-- au("WinLeave", function(_)
+--   local winid = vim.api.nvim_get_current_win()
+--   local wininfo = vim.fn.getwininfo(winid)[1]
+--
+--   if wininfo.loclist == 0 and wininfo.quickfix == 0 then
+--     return
+--   end
+--   vim.api.nvim_win_close(winid, true)
+-- end)
+
 --require"vim.lsp.log".set_level("debug")
 
 util.nmap("<leader>Q", ":qa!<cr>")
@@ -94,6 +124,8 @@ vim.cmd([[
   autocmd FileType tex set shiftwidth=2
   autocmd FileType tex set tabstop=2
 
+  autocmd! FileType help :wincmd L | :vert resize 90 " open help window vertically
+
   autocmd TermOpen * setlocal nonumber
 
   " Return to last edit position when opening files (You want this!)
@@ -102,7 +134,6 @@ vim.cmd([[
        \   exe "normal! g`\"" |
        \ endif
   
-  set termguicolors
   set guifont=DejaVuSansM\ Nerd\ Font\ Mono:h8:i
 
   nnoremap gp `[v`]
