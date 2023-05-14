@@ -103,6 +103,8 @@ return require('packer').startup(function(use)
     'nvim-lualine/lualine.nvim',
     requires = { 'nvim-tree/nvim-web-devicons', opt = true }
   }
+  my_use 'onsails/lspkind.nvim'
+  my_use 'nvim-tree/nvim-web-devicons'
 
   -- misc
   my_use "akinsho/toggleterm.nvim"

@@ -73,6 +73,8 @@ require"comment_config"
 
 require"tree_config"
 
+require"devicons_config"
+
 local au = function(events, callback, opts)
   opts = opts or {}
   opts.callback = callback

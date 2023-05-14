@@ -1,5 +1,6 @@
 -- Setup nvim-cmp.
 local cmp = require'cmp'
+local lspkind = require('lspkind')
 
 cmp.setup({
   snippet = {
@@ -33,6 +34,9 @@ cmp.setup({
   }),
   experimental = {
     ghost_text = true -- this feature conflict with copilot.vim's preview.
+  },
+  formatting = {
+    format = lspkind.cmp_format(),
   }
 })
 

@@ -60,6 +60,7 @@ telescope.setup {
         end
       }
     },
+    color_devicons=true,
     initial_mode = "normal"
   },
   pickers = {
