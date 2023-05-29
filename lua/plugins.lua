@@ -16,19 +16,12 @@ function Set (list)
   return set
 end
 
-local localized_repos =
-Set {
-  "nvim-lspconfig",
-  "nvim-cmp",
-  "lean.nvim",
-  "leap.nvim",
-  "toggleterm.nvim",
-  "resession.nvim",
-  "friendly-snippets",
-  "LuaSnip",
-  "telescope.nvim",
-  "qf.nvim",
-}
+local paths = vim.split(vim.fn.glob('~/plugins/*'), '\n')
+local localized_repos = {}
+for _, path in pairs(paths) do
+  local tail = vim.fn.fnamemodify(path, ':t')
+  localized_repos[tail] = path
+end
 
 return require('packer').startup(function(use)
   -- set to true when using local development repos
@@ -43,8 +36,7 @@ return require('packer').startup(function(use)
     local author = split_path[1]
     local repo = split_path[2]
 
-    local prefix = use_local and localized_repos[repo] and "~" or author
-    path = prefix .. "/" .. repo
+    local path = use_local and localized_repos[repo] or author .. "/" .. repo
 
     if is_table then
       arg[1] = path

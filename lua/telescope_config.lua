@@ -99,7 +99,7 @@ vim.keymap.set("n", "<leader>fb", function() builtin.buffers() end)
 vim.keymap.set("n", "<leader>fh", function() builtin.help_tags() end)
 vim.keymap.set("n", "<leader>f:", function() builtin.command_history() end)
 vim.keymap.set("n", "<leader>f/", function() builtin.search_history() end)
-vim.keymap.set("n", "<leader>fo", function() builtin.oldfiles() end)
+vim.keymap.set("n", "<leader>fo", function() builtin.oldfiles({cwd_only = true}) end)
 vim.keymap.set("n", "<leader>fs", function() builtin.lsp_dynamic_workspace_symbols() end)
 
 vim.keymap.set("n", "<leader>fz", telescope.extensions.zoxide.list)
