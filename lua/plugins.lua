@@ -62,7 +62,7 @@ return require('packer').startup(function(use)
     my_use "jvgrootveld/telescope-zoxide"
     my_use "LukasPietzschmann/telescope-tabs"
   my_use "ggandor/leap.nvim"
-  my_use "ggandor/flit.nvim"
+  --my_use "ggandor/flit.nvim"
 
   -- git
   my_use "lewis6991/gitsigns.nvim"
@@ -86,7 +86,7 @@ return require('packer').startup(function(use)
   my_use "lervag/vimtex"
 
   -- syntax highlighting
-  my_use "bakpakin/fennel.vim"
+  my_use {"YohananDiamond/fennel.vim", branch="remove-dot-and-colon-from-keywords"}
 
   -- UI
   my_use 'nanozuki/tabby.nvim'

@@ -17,6 +17,16 @@ for _, server in ipairs(servers) do
         },
       },
     }
+  elseif server == "fennel_language_server" then
+    opts.settings = {
+      fennel = {
+        workspace = {
+          -- If you are using hotpot.nvim or aniseed,
+          -- make the server aware of neovim runtime files.
+          library = vim.api.nvim_list_runtime_paths(),
+        },
+      },
+    }
   end
 
   opts.on_attach = require "lsp_config".on_attach

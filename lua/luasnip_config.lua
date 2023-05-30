@@ -43,5 +43,5 @@ vim.api.nvim_set_keymap("s", "<C-n>", "<Plug>luasnip-next-choice", {})
 vim.api.nvim_set_keymap("i", "<C-p>", "<Plug>luasnip-prev-choice", {})
 vim.api.nvim_set_keymap("s", "<C-p>", "<Plug>luasnip-prev-choice", {})
 
-vim.keymap.set("i", "<C-d>", function() if luasnip then luasnip.jump(1) end end, {})
+vim.keymap.set("i", "<C-j>", function() if luasnip then luasnip.jump(1) end end, {})
 vim.keymap.set("i", "<C-u>", function() if luasnip then print(luasnip.jumpable(-1)) luasnip.jump(-1) end end, {})

@@ -5,6 +5,7 @@ local theme = {
   current_tab = 'TabLineSel',
   tab = 'TabLine',
   win = 'TabLine',
+  current_win = 'TabLineSel',
   tail = 'TabLine',
 }
 
@@ -34,29 +35,31 @@ require('tabby.tabline').set(function(line)
       require("tabby.feature.tab_name").set(tab.id, get_tab_name(tab.id))
       local hl = tab.is_current() and theme.current_tab or theme.tab
       return {
-        line.sep('|', hl, theme.fill),
-        not tab.is_current() and '◎' or '◉',
+        line.sep(' ', hl, theme.fill),
+        --not tab.is_current() and '◎' or '◉',
         tab.number(),
         tab.name(),
         --tab.close_btn(''),
-        line.sep('|', hl, theme.fill),
+        --line.sep('|', hl, theme.fill),
         hl = hl,
-        margin = ' ',
+        -- margin = ' ',
       }
     end),
     line.spacer(),
     line.wins_in_tab(line.api.get_current_tab()).foreach(function(win)
+      local hl = win.is_current() and theme.current_win or theme.win
       return {
-        line.sep('|', theme.win, theme.fill),
-        not win.is_current() and '◎' or '◉',
+        line.sep(' ', theme.win, theme.fill),
+        --not win.is_current() and '◎' or '◉',
         win.buf_name(),
-        line.sep('|', theme.win, theme.fill),
-        hl = theme.win,
-        margin = ' ',
+        -- ' ',
+        -- line.sep('|', theme.win, theme.fill),
+        hl = hl,
+        -- margin = ' ',
       }
     end),
     {
-      line.sep('|', theme.tail, theme.fill),
+      line.sep(' ', theme.tail, theme.fill),
       { '  ', hl = theme.tail },
     },
     hl = theme.fill,
