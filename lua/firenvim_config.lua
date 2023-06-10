@@ -53,3 +53,14 @@ vim.g.firenvim_config = {
 
 vim.o.spell = true
 vim.o.spelllang = "en_us"
+vim.b.catppuccin_dark = false
+vim.cmd.colorscheme "catppuccin-latte"
+
+vim.keymap.set("n", "<C-x>", function()
+  vim.b.catppuccin_dark = not vim.b.catppuccin_dark
+  if vim.b.catppuccin_dark then
+    vim.cmd.colorscheme "catppuccin-mocha"
+  else
+    vim.cmd.colorscheme "catppuccin-latte"
+  end
+end)

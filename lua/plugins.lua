@@ -30,8 +30,7 @@ return require('packer').startup(function(use)
   local my_use = function(arg)
     local is_table = type(arg) == "table"
 
-    local path = is_table and arg[1] or arg
-    local split_path = vim.fn.split(path, "/")
+    local split_path = vim.fn.split(is_table and arg[1] or arg, "/")
 
     local author = split_path[1]
     local repo = split_path[2]
@@ -61,7 +60,7 @@ return require('packer').startup(function(use)
     -- telescope extensions
     my_use "jvgrootveld/telescope-zoxide"
     my_use "LukasPietzschmann/telescope-tabs"
-  my_use "ggandor/leap.nvim"
+  my_use {"rish987/leap.nvim", branch="telescope-integration"}
   --my_use "ggandor/flit.nvim"
 
   -- git

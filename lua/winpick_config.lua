@@ -8,7 +8,9 @@ winpick.setup({
   chars = nil,
 })
 
-vim.keymap.set("n", "<C-w><C-w>", function()
+vim.keymap.set("n", "<C-w><C-w>", "<C-w><C-p>")
+
+vim.keymap.set("n", "<C-w>q", function()
   local winid = winpick.select()
 
   if winid then
