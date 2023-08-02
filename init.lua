@@ -75,6 +75,12 @@ require"tree_config"
 
 require"devicons_config"
 
+require"diffview_config"
+
+require"vgit_config"
+
+require"easyalign_config"
+
 local au = function(events, callback, opts)
   opts = opts or {}
   opts.callback = callback
@@ -109,9 +115,11 @@ util.nmap("<leader>sl", ":ToggleTermLast<CR>")
 util.nmap("<leader>sn", ":ToggleTermNew<CR>")
 util.nmap("<leader>Tt", ":tabnew<CR>")
 util.nmap("<leader>pp", ':let @" = join(readfile("/home/gcloud/temp"), "\\n")<CR>')
-util.nmap("<leader>yy", ":call writefile(getreg('\"', 1, 1), \"/home/gcloud/temp\", \"S\")<CR>")
+util.nmap("<leader>yy", ":call writefile(getreg('\"', 1, 1), \"/home/pugobat11144/temp\", \"S\")<CR>")
 util.nmap("<leader>cp", ":let @\" = expand(\"%\")<CR>")
 util.nmap("<leader>o", ":mes<CR>")
+util.nmap("<C-j>", "<C-d>")
+util.nmap("<C-k>", "<C-u>")
 
 vim.cmd.colorscheme "catppuccin"
 
@@ -126,7 +134,7 @@ vim.cmd([[
   autocmd FileType tex set shiftwidth=2
   autocmd FileType tex set tabstop=2
 
-  autocmd! FileType help :wincmd L | :vert resize 90 " open help window vertically
+  autocmd! FileType help :wincmd H | :vert resize 90 " open help window vertically
 
   autocmd TermOpen * setlocal nonumber
 
@@ -137,6 +145,7 @@ vim.cmd([[
        \ endif
   
   set guifont=DejaVuSansM\ Nerd\ Font\ Mono:h8:i
+  set mouse=a
 
   nnoremap gp `[v`]
 ]])

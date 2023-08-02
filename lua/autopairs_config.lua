@@ -3,6 +3,7 @@ local Rule = require("nvim-autopairs.rule")
 local cond = require("nvim-autopairs.conds")
 
 npairs.setup {}
+npairs.remove_rule('`')
 
 npairs.add_rules({
     Rule("$", "$", {"tex", "latex"})

@@ -66,6 +66,7 @@ return require('packer').startup(function(use)
   -- git
   my_use "lewis6991/gitsigns.nvim"
   my_use { 'sindrets/diffview.nvim', requires = 'nvim-lua/plenary.nvim' }
+  my_use "tanvirtin/vgit.nvim"
 
   -- completion
   my_use "hrsh7th/nvim-cmp"
@@ -96,6 +97,7 @@ return require('packer').startup(function(use)
   }
   my_use 'onsails/lspkind.nvim'
   my_use 'nvim-tree/nvim-web-devicons'
+  my_use 'lukas-reineke/indent-blankline.nvim'
 
   -- misc
   my_use "akinsho/toggleterm.nvim"
@@ -115,6 +117,7 @@ return require('packer').startup(function(use)
   --my_use 'ten3roberts/qf.nvim'
   my_use 'numToStr/Comment.nvim'
   my_use 'nvim-tree/nvim-tree.lua'
+  my_use 'junegunn/vim-easy-align'
 
   -- Automatically set up your configuration after cloning packer.nvim
   -- Put this at the end after all plugins
