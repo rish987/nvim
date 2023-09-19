@@ -8,6 +8,10 @@ vim.g.vimtex_compiler_latexmk = {
   },
 }
 
-vim.g.vimtex_view_method = "zathura"
+vim.g.vimtex_view_method = "sioyek"
 vim.g.vimtex_view_enabled = true
-vim.g.vimtex_view_general_options = "--mode fullscreen @pdf"
+vim.g.vimtex_view_general_options = "--new-window"
+vim.g.vimtex_quickfix_open_on_warning = false
+vim.g.vimtex_quickfix_ignore_filters = {
+       'LaTeX Font Warning',
+      }

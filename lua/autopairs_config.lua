@@ -12,3 +12,6 @@ npairs.add_rules({
     -- disable adding a newline when you press <cr>
     :with_cr(cond.none()),
 })
+
+-- TODO count number of closing delimiters and jump accordingly
+vim.keymap.set({"i"}, "<C-l>", function () vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<Right>", true, true, true)) end)

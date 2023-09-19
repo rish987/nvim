@@ -39,13 +39,13 @@ require"gitsigns_config"
 
 require"completion_config"
 
+require"luasnip_config"
+
 require"telescope_config"
 
 require"surround_config"
 
 require"hop_config"
-
-require"luasnip_config"
 
 require"toggleterm_config"
 
@@ -77,7 +77,7 @@ require"devicons_config"
 
 require"diffview_config"
 
-require"vgit_config"
+--require"vgit_config"
 
 require"easyalign_config"
 

@@ -22,7 +22,7 @@ _G.tab_complete = function()
   elseif check_back_space() then
     return t "<Tab>"
   else
-    cmp.complete()
+    cmp.mapping.confirm({ select = true })(function () vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<Right>", true, true, true)) end)
   end
   return ""
 end
@@ -45,3 +45,15 @@ vim.api.nvim_set_keymap("s", "<C-p>", "<Plug>luasnip-prev-choice", {})
 
 vim.keymap.set("i", "<C-j>", function() if luasnip then luasnip.jump(1) end end, {})
 vim.keymap.set("i", "<C-u>", function() if luasnip then print(luasnip.jumpable(-1)) luasnip.jump(-1) end end, {})
+
+vim.api.nvim_create_autocmd('ModeChanged', {
+  pattern = '*',
+  callback = function()
+    if ((vim.v.event.old_mode == 's' and vim.v.event.new_mode == 'n') or vim.v.event.old_mode == 'i')
+        and require('luasnip').session.current_nodes[vim.api.nvim_get_current_buf()]
+        and not require('luasnip').session.jump_active
+    then
+      require('luasnip').unlink_current()
+    end
+  end
+})
