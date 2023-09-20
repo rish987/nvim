@@ -118,6 +118,8 @@ util.nmap("<leader>pp", ':let @" = join(readfile("/home/gcloud/temp"), "\\n")<CR
 util.nmap("<leader>yy", ":call writefile(getreg('\"', 1, 1), \"/home/pugobat11144/temp\", \"S\")<CR>")
 util.nmap("<leader>cp", ":let @\" = expand(\"%\")<CR>")
 util.nmap("<leader>o", ":mes<CR>")
+util.nmap("<leader>k", ":set winfixheight<CR>")
+util.nmap("<leader>h", ":set winfixwidth<CR>")
 util.nmap("<C-j>", "<C-d>")
 util.nmap("<C-k>", "<C-u>")
 

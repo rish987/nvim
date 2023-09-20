@@ -7,24 +7,59 @@ local t = function(str)
     return vim.api.nvim_replace_termcodes(str, true, true, true)
 end
 
-local check_back_space = function()
-  local col = vim.fn.col('.') - 1
-  if col == 0 or vim.fn.getline('.'):sub(col, col):match('%s') then
-    return true
+local delims = {
+  ["}"] = true,
+  ["]"] = true,
+  ["'"] = true,
+  ["\""] = true,
+  ["$"] = true,
+  [")"] = true
+}
+
+local check_next_delim = function(line, col)
+  if col <= (#line + 1) then
+    local char = line:sub(col, col)
+    if delims[char] then
+      return true
+    end
+
+    return false
   else
     return false
   end
 end
 
+-- local check_back_space = function()
+--   local col = vim.fn.col('.') - 1
+--   if col == 0 or vim.fn.getline('.'):sub(col, col):match('%s') then
+--     return true
+--   else
+--     return false
+--   end
+-- end
+--
 _G.tab_complete = function()
-  if luasnip and luasnip.expand_or_jumpable() then
+  if luasnip and luasnip.jumpable(1) then
     return t("<Plug>luasnip-expand-or-jump")
-  elseif check_back_space() then
-    return t "<Tab>"
   else
-    cmp.mapping.confirm({ select = true })(function () vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<Right>", true, true, true)) end)
+    local col = vim.fn.col('.')
+    local line = vim.fn.getline('.')
+    if check_next_delim(line, col) then
+      while check_next_delim(line, col) do
+        col = col + 1
+        vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<Right>", true, true, true))
+      end
+      return ""
+    else
+      if luasnip.expandable() then
+        return t("<Plug>luasnip-expand-or-jump")
+      else
+        local ret = ""
+        cmp.mapping.confirm({ select = true })(function () ret = t "<Tab>" end)
+        return ret
+      end
+    end
   end
-  return ""
 end
 _G.s_tab_complete = function()
   if luasnip and luasnip.jumpable(-1) then
