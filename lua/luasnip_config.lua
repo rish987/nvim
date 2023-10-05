@@ -1,4 +1,5 @@
 local luasnip = require('luasnip')
+local npairs = require("nvim-autopairs")
 local cmp = require("cmp")
 local a = require('plenary.async_lib')
 local async = require('plenary.async')
@@ -9,27 +10,34 @@ local t = function(str)
     return vim.api.nvim_replace_termcodes(str, true, true, true)
 end
 
-local delims = {
-  ["}"] = true,
-  ["]"] = true,
-  ["'"] = true,
-  ["\""] = true,
-  ["$"] = true,
-  [")"] = true
-}
-
 local check_next_delim = function(line, col)
-  if col <= (#line + 1) then
-    local char = line:sub(col, col)
-    if delims[char] then
-      return true
+  for _, rule in ipairs(npairs.get_buf_rules(vim.api.nvim_get_current_buf())) do
+    if rule.start_pair then
+      local delim = rule.end_pair
+      if line:find(delim, col, true) == col then return delim end
     end
-
-    return false
-  else
-    return false
   end
 end
+
+local skip_delims = function()
+  local col = vim.fn.col('.')
+  local line = vim.fn.getline('.')
+
+  local next_delim = check_next_delim(line, col)
+  while next_delim do
+    for _ = 1, vim.fn.strdisplaywidth(next_delim) do
+      vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<Right>", true, true, true))
+    end
+
+    col = col + #next_delim
+    if col > #line then return end
+
+    next_delim = check_next_delim(line, col)
+  end
+end
+
+-- vim.keymap.set("i", "<Tab>", skip_delims)
+
 -- TODO fix a.util.timeout function? (which uses a.wrap instead)
 local timeout = async.wrap(function(fn, ms, callback)
   -- make sure that the callback isn't called twice, or else the coroutine can be dead
@@ -77,9 +85,15 @@ local tab_complete = function()
     end
 
     if not skip then
-      while check_next_delim(line, col) do
-        col = col + 1
-        vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<Right>", true, true, true))
+      local next_delim = check_next_delim(line, col)
+      while next_delim do
+        for _ = 1, vim.fn.strdisplaywidth(next_delim) do
+          vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<Right>", true, true, true))
+        end
+
+        col = col + #next_delim
+
+        next_delim = col <= #line and check_next_delim(line, col)
       end
       return
     end
