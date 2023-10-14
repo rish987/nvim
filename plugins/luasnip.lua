@@ -1,17 +1,5 @@
-local luasnip = require('luasnip')
-local npairs = require("nvim-autopairs")
-local cmp = require("cmp")
-local a = require('plenary.async_lib')
-local async = require('plenary.async')
-
-require("luasnip.loaders.from_vscode").lazy_load()
-
-local t = function(str)
-    return vim.api.nvim_replace_termcodes(str, true, true, true)
-end
-
 local check_next_delim = function(line, col)
-  for _, rule in ipairs(npairs.get_buf_rules(vim.api.nvim_get_current_buf())) do
+  for _, rule in ipairs(require("nvim-autopairs").get_buf_rules(vim.api.nvim_get_current_buf())) do
     if rule.start_pair then
       local delim = rule.end_pair
       if line:find(delim, col, true) == col then return delim end
@@ -39,7 +27,7 @@ end
 -- vim.keymap.set("i", "<Tab>", skip_delims)
 
 -- TODO fix a.util.timeout function? (which uses a.wrap instead)
-local timeout = async.wrap(function(fn, ms, callback)
+local timeout = require'plenary.async'.wrap(function(fn, ms, callback)
   -- make sure that the callback isn't called twice, or else the coroutine can be dead
   local done = false
 
@@ -57,7 +45,7 @@ local timeout = async.wrap(function(fn, ms, callback)
     end
   end, ms)
 
-  a.run(fn, timeout_callback)
+  require('plenary.async_lib').run(fn, timeout_callback)
 end, 3)
 
 -- local check_back_space = function()
@@ -70,6 +58,8 @@ end, 3)
 -- end
 --
 local tab_complete = function()
+  local luasnip = require('luasnip')
+  local cmp = require("cmp")
   local col = vim.fn.col('.')
   local line = vim.fn.getline('.')
 
@@ -116,35 +106,31 @@ local tab_complete = function()
 
   vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<CR>", true, true, true))
 end
+return {
+  "rafamadriz/friendly-snippets", -- collection of my_useful snippets
+  {
+    "L3MON4D3/LuaSnip",
+    event = "InsertEnter",
+    build = "make install_jsregexp",
+    init = function ()
+      -- vim.keymap.set("i", "<C-u>", function() if luasnip then print(luasnip.jumpable(-1)) luasnip.jump(-1) end end, {})
+      vim.keymap.set("i", "<Tab>", require'plenary.async'.void(tab_complete))
+      vim.keymap.set("i", "<C-j>", function() require"luasnip".jump(1) end, {})
 
-_G.s_tab_complete = function()
-  if luasnip and luasnip.jumpable(-1) then
-    return t("<Plug>luasnip-jump-prev")
-  end
-
-  return t "<S-Tab>"
-end
-
-vim.keymap.set("i", "<Tab>", async.void(tab_complete))
-vim.api.nvim_set_keymap("s", "<Tab>", "v:lua.tab_complete()", {expr = true})
-vim.api.nvim_set_keymap("i", "<S-Tab>", "v:lua.s_tab_complete()", {expr = true})
-vim.api.nvim_set_keymap("s", "<S-Tab>", "v:lua.s_tab_complete()", {expr = true})
-vim.api.nvim_set_keymap("i", "<C-n>", "<Plug>luasnip-next-choice", {})
-vim.api.nvim_set_keymap("s", "<C-n>", "<Plug>luasnip-next-choice", {})
-vim.api.nvim_set_keymap("i", "<C-p>", "<Plug>luasnip-prev-choice", {})
-vim.api.nvim_set_keymap("s", "<C-p>", "<Plug>luasnip-prev-choice", {})
-
-vim.keymap.set("i", "<C-j>", function() if luasnip then luasnip.jump(1) end end, {})
-vim.keymap.set("i", "<C-u>", function() if luasnip then print(luasnip.jumpable(-1)) luasnip.jump(-1) end end, {})
-
-vim.api.nvim_create_autocmd('ModeChanged', {
-  pattern = '*',
-  callback = function()
-    if ((vim.v.event.old_mode == 's' and vim.v.event.new_mode == 'n') or vim.v.event.old_mode == 'i')
-        and require('luasnip').session.current_nodes[vim.api.nvim_get_current_buf()]
-        and not require('luasnip').session.jump_active
-    then
-      require('luasnip').unlink_current()
+      vim.api.nvim_create_autocmd('ModeChanged', {
+        pattern = '*',
+        callback = function()
+          if ((vim.v.event.old_mode == 's' and vim.v.event.new_mode == 'n') or vim.v.event.old_mode == 'i')
+            and require('luasnip').session.current_nodes[vim.api.nvim_get_current_buf()]
+            and not require('luasnip').session.jump_active
+            then
+              require('luasnip').unlink_current()
+            end
+          end
+        })
+    end,
+    config = function (_, _)
+      require("luasnip.loaders.from_vscode").lazy_load()
     end
-  end
-})
+  }
+}

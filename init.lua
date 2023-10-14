@@ -25,68 +25,6 @@ vim.o.tabstop=4
 vim.o.shiftwidth=4
 vim.o.mouse = ""
 
-require"plugins"
-
-require"lsp_installer"
-
-require"lsp_config"
-
-require"lean_config"
-
-require"nvimux_config"
-
-require"gitsigns_config"
-
-require"completion_config"
-
-require"luasnip_config"
-
-require"telescope_config"
-
-require"surround_config"
-
-require"hop_config"
-
-require"toggleterm_config"
-
-require"neogit_config"
-
-require"winpick_config"
-
-require"resession_config"
-
-require"tabby_config"
-
-require"firenvim_config"
-
-require"vimtex_config"
-
-require"neoscroll_config"
-
-require"lualine_config"
-
-require"autopairs_config"
-
---require"qf_config"
-
-require"comment_config"
-
-require"tree_config"
-
-require"devicons_config"
-
-require"diffview_config"
-
---require"vgit_config"
-
-require"easyalign_config"
-
-local au = function(events, callback, opts)
-  opts = opts or {}
-  opts.callback = callback
-  vim.api.nvim_create_autocmd(events, opts)
-end
-
 -- -- auto-close quickfix/location after leaving it
 -- au("WinLeave", function(_)
 --   local winid = vim.api.nvim_get_current_win()
@@ -122,6 +60,8 @@ util.nmap("<leader>k", ":set winfixheight<CR>")
 util.nmap("<leader>h", ":set winfixwidth<CR>")
 util.nmap("<C-j>", "<C-d>")
 util.nmap("<C-k>", "<C-u>")
+util.vmap("<C-j>", "<C-d>")
+util.vmap("<C-k>", "<C-u>")
 
 vim.cmd.colorscheme "catppuccin"
 

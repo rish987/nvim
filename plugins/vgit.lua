@@ -1,0 +1,11 @@
+--   my_use "tanvirtin/vgit.nvim"
+-- require('vgit').setup({
+--   keymaps = {
+--     ['n <leader>dh'] = function() require('vgit').buffer_hunk_preview() end,
+--   },
+--   settings = {
+--     live_blame = {
+--       enabled = false
+--     }
+--   }
+-- })
