@@ -104,7 +104,17 @@ local tab_complete = function()
     return
   end
 
-  cmp.mapping.confirm({ select = true })(function () end)
+  if cmp.core.view:visible() then
+    cmp.mapping.confirm({ select = true })(function () end)
+    return
+  end
+
+  if col ~= #line + 1 then
+    vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<C-o>$", true, true, true))
+    return
+  end
+
+  vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<CR>", true, true, true))
 end
 
 _G.s_tab_complete = function()

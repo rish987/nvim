@@ -1,6 +1,23 @@
 --local util = require"config_util"
+local leap = require('leap')
+leap.opts.equivalence_classes = {
+  "b(){}",
+  "r[]",
+  "l.",
+  "k,",
+  "v=",
+  "m\"",
+  "j'",
+  "d_",
+  "g\\",
+  "c-",
+  "e+",
+  "o;",
+  "p:",
+}
 
-require('leap').add_default_mappings()
+leap.add_default_mappings()
+  leap.opts.special_keys.prev_target = { '<s-enter>', ',' }
 
 local function get_line_starts(winid, forward, empty, beginning)
   local wininfo =  vim.fn.getwininfo(winid)[1]
@@ -45,7 +62,7 @@ end
 
 local function leap_to_line(forward, empty, beginning)
   local winid = vim.api.nvim_get_current_win()
-  require('leap').leap {
+  leap.leap {
     target_windows = { winid },
     targets = get_line_starts(winid, forward, empty, beginning),
   }

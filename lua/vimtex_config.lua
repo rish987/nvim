@@ -2,6 +2,7 @@ vim.g.vimtex_compiler_latexmk = {
   ['options'] = {
     '-verbose',
     '-file-line-error',
+    '-shell-escape',
     '-xelatex',
     '-synctex=1',
     '-interaction=nonstopmode',

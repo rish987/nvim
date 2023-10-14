@@ -13,7 +13,10 @@ local settings_override = {
       },
       diagnostics = {
         disable = {"duplicate-set-field", "duplicate-doc-field"}
-      }
+      },
+      workspace = {
+        checkThirdParty = false,
+      },
     }
   },
   ["fennel_language_server"] = {
