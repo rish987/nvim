@@ -4,6 +4,8 @@ return {
     build = ":MasonUpdate", -- :MasonUpdate updates registry contents
     lazy = false,
     init = function ()
+      require"mason".setup {}
+
       local lspconfig = require "lspconfig"
 
       local settings_override = {
@@ -43,6 +45,7 @@ return {
 
         lspconfig[server].setup(opts)
       end
+      require"mason"
     end,
     dependencies = {
       "neovim/nvim-lspconfig"
