@@ -5,6 +5,7 @@ return {
     lazy = false,
     init = function ()
       require"mason".setup {}
+      require"neodev".setup {}
 
       local lspconfig = require "lspconfig"
 
@@ -45,11 +46,13 @@ return {
 
         lspconfig[server].setup(opts)
       end
-      require"mason"
     end,
     dependencies = {
       "neovim/nvim-lspconfig"
     }
   },
-  "folke/neodev.nvim",
+  {
+    "folke/neodev.nvim",
+    opts = {}
+  }
 }

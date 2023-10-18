@@ -4,7 +4,6 @@ return {
     lazy = false,
     config = function (_, _)
       local cmp = require"cmp"
-      local lspkind = require('lspkind')
 
       local opts = {
         snippet = {

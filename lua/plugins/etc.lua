@@ -9,7 +9,7 @@ return {
       vim.cmd.colorscheme"catppuccin"
     end,
   },
-  'onsails/lspkind.nvim',
+  { 'onsails/lspkind.nvim', },
   "andymass/vim-matchup",
-  'lukas-reineke/indent-blankline.nvim',
+  { "lukas-reineke/indent-blankline.nvim", main = "ibl", opts = {} }
 }
