@@ -147,6 +147,8 @@ local multifun = function(_actions)
         table.insert(virt_text, _action.virt_text)
       end
 
+      table.insert(virt_text, 3, {" ", "Normal"}) -- separate currently selected action from alternatives
+
       vim.api.nvim_buf_set_extmark(0, mfns, row - 1, col, {virt_text = virt_text, virt_text_pos = "overlay", priority = 10000})
       vim.cmd.redraw()
 
