@@ -57,13 +57,61 @@ end, 3)
 --   end
 -- end
 
+local mfns = vim.api.nvim_create_namespace('multifun')
+local colors = {
+  {"Red",          "White"},
+  {"Green",        "White"},
+  {"Blue",         "White"},
+  {"Cyan",         "Black"},
+  {"Magenta",      "White"},
+  {"Yellow",       "Black"},
+  {"Gray",         "Black"},
+  {"Orange",       "Black"},
+  {"LightRed",     "Black"},
+  {"LightGreen",   "Black"},
+  {"LightBlue",    "Black"},
+  {"LightCyan",    "Black"},
+  {"LightMagenta", "Black"},
+  {"LightYellow",  "Black"},
+  {"LightGray",    "Black"},
+  {"Purple",       "White"},
+}
+local hls = {}
+
+for _, color in ipairs(colors) do
+  local hlname = string.format("MF%s", color[1])
+  vim.cmd(string.format("highlight %s guibg=%s guifg=%s", hlname, color[1], color[2]))
+  table.insert(hls, hlname)
+end
+
 local multifun = function(_actions)
   return function()
+    local color_idx = 1
+    local set_virt_text = function (action)
+      if not action.virt_text then -- set both text and hl
+        action.virt_text = {" ", hls[color_idx]}
+        color_idx = color_idx + 1
+      elseif type(action.virt_text) == "string" then -- set only hl
+        action.virt_text = {action.virt_text, hls[color_idx]}
+        color_idx = color_idx + 1
+      end
+    end
+
     local actions
     if type(_actions) == "function" then
       actions = _actions()
     else
       actions = _actions
+    end
+
+    for _, action in ipairs(actions) do
+      if action[1] then -- is a list of equal-priority actions
+        for _, _action in ipairs(action) do
+          set_virt_text(_action)
+        end
+      else
+        set_virt_text(action)
+      end
     end
 
     local conflicting_actions = {}
@@ -90,10 +138,22 @@ local multifun = function(_actions)
         return
       end
 
-      -- TODO show extmark hint regarding current conflicts and resolution order
+      local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+
+      local virt_text = {}
+      table.insert(virt_text, {" ", "Normal"})
+
+      for _, _action in ipairs({unpack(conflicting_actions, i, #conflicting_actions)}) do
+        table.insert(virt_text, _action.virt_text)
+      end
+
+      vim.api.nvim_buf_set_extmark(0, mfns, row - 1, col, {virt_text = virt_text, virt_text_pos = "overlay", priority = 10000})
+      vim.cmd.redraw()
 
       local key
       local timed_out = timeout(function (cb) key = vim.fn.getcharstr() cb() end, 1000) -- wait for another tabkey
+
+      vim.api.nvim_buf_clear_namespace(0, mfns, 0, -1) -- clear extmark
       if timed_out then
         vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<Tab>", true, true, true))
         action.cb()
@@ -114,16 +174,16 @@ local tab_actions = function()
   local col = vim.fn.col('.')
   local line = vim.fn.getline('.')
 
-  print(col, #line)
   return {
-    {cb = luasnip.expand, cond = luasnip.expandable, desc = "luasnip expand"},
-    {cb = function() luasnip.jump(1) end, cond = function() return luasnip.jumpable(1) end, desc = "luasnip jump" },
+    {cb = luasnip.expand, cond = luasnip.expandable, desc = "luasnip expand", virt_text = "e"},
+    {cb = function() luasnip.jump(1) end, cond = function() return luasnip.jumpable(1) end, desc = "luasnip jump", virt_text = "j"},
     {
       cb = function()
               cmp.mapping.confirm({ select = true })(function () end)
            end,
       cond = function() return cmp.core.view:visible() end,
-      desc = "confirm first completion"
+      desc = "confirm first completion",
+      virt_text = "c"
     },
     {
       {
@@ -140,21 +200,24 @@ local tab_actions = function()
           end
         end,
         cond = function() return check_next_delim(line, col) end,
-        desc = "jump over ending pairs"
+        desc = "jump over ending pairs",
+        virt_text = "p"
       },
       {
         cb = function()
           vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<C-o>$", true, true, true))
         end,
         cond = function() return col ~= #line + 1 end,
-        desc = "jump to end of line"
+        desc = "jump to end of line",
+        virt_text = "l"
       },
       {
         cb = function()
           vim.fn.feedkeys(vim.api.nvim_replace_termcodes("<CR>", true, true, true))
         end,
         cond = function() return col == #line + 1 end,
-        desc = "new line"
+        desc = "new line",
+        virt_text = "n"
       },
     },
   }
