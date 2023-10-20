@@ -28,7 +28,22 @@ return {
         sources = cmp.config.sources({
           { name = 'nvim_lsp' },
           { name = 'luasnip' },
-          { name = 'buffer' },
+          { name = 'buffer',
+            option =
+            {
+              get_bufnrs = function()
+                local bufs = {}
+                for _, buf in pairs(vim.api.nvim_list_bufs()) do
+                  local rootdir = string.sub(vim.fn.system("git rev-parse --show-toplevel"), 1, -2)
+                  local filename = vim.api.nvim_buf_get_name(buf)
+                  if filename:find(rootdir, 1, true) == 1 then
+                    table.insert(bufs, buf)
+                  end
+                end
+                return bufs
+              end
+            }
+          },
           { name = 'path' },
           --{
           --  name = "dictionary",
