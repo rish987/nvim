@@ -20,9 +20,9 @@ vim.o.expandtab = true
 vim.o.timeout = false
 vim.o.history = 1000
 vim.o.jumpoptions = "stack"
-vim.o.softtabstop=4
-vim.o.tabstop=4
-vim.o.shiftwidth=4
+vim.o.softtabstop=2
+vim.o.tabstop=2
+vim.o.shiftwidth=2
 vim.o.mouse = ""
 
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
@@ -65,6 +65,7 @@ require("lazy").setup("plugins",
 -- end)
 
 --require"vim.lsp.log".set_level("debug")
+require("multifun")
 
 util.nmap("<leader>Q", ":qa!<cr>")
 util.nmap("<leader>E", ":edit<cr>")
