@@ -308,7 +308,7 @@ end
 
 vim.api.nvim_create_autocmd({"TextChangedI", "CursorMovedI", "InsertEnter"},
   {
-    callback = function (info) print(info.event) hint("i", tab_actions) end,
+    callback = function (info) --[[ print(info.event) ]] hint("i", tab_actions) end,
   })
 vim.api.nvim_create_autocmd({"User"},
   {

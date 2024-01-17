@@ -48,8 +48,14 @@ require("lazy").setup("plugins",
         "hrsh7th/nvim-cmp",
         "hrsh7th/cmp-buffer",
         "ggandor/leap.nvim",
+        "Julian/lean.nvim",
       }, -- For example {"folke"}
       fallback = false, -- Fallback to git when local plugin doesn't exist
+    },
+    change_detection = {
+      -- automatically check for config file changes and reload the ui
+      enabled = true,
+      notify = false, -- get a notification when changes are found
     },
   })
 
@@ -66,31 +72,6 @@ require("lazy").setup("plugins",
 
 --require"vim.lsp.log".set_level("debug")
 require("multifun")
-
-util.nmap("<leader>Q", ":qa!<cr>")
-util.nmap("<leader>E", ":edit<cr>")
-util.nmap("<leader>w", ":w<cr>")
-util.nmap("<leader>cl", ":ccl<cr>")
-util.nmap("<leader>xx", ":q<cr>")
-util.nmap("<leader>p", ":set paste<CR>")
-util.nmap("<leader>np", ":set nopaste<CR>")
-util.nmap("<leader>m", ":setlo nomodifiable<CR>")
-util.nmap("<leader>M", ":setlo modifiable<CR>")
-util.nmap("<leader>L", ":LspInfo<CR>")
-util.nmap("<leader>sc", ":ToggleTermContextClear<CR>")
-util.nmap("<leader>sl", ":ToggleTermLast<CR>")
-util.nmap("<leader>sn", ":ToggleTermNew<CR>")
-util.nmap("<leader>Tt", ":tabnew<CR>")
-util.nmap("<leader>pp", ':let @" = join(readfile("/home/gcloud/temp"), "\\n")<CR>')
-util.nmap("<leader>yy", ":call writefile(getreg('\"', 1, 1), \"/home/pugobat11144/temp\", \"S\")<CR>")
-util.nmap("<leader>cp", ":let @\" = expand(\"%\")<CR>")
-util.nmap("<leader>o", ":mes<CR>")
-util.nmap("<leader>k", ":set winfixheight<CR>")
-util.nmap("<leader>h", ":set winfixwidth<CR>")
-util.nmap("<C-j>", "<C-d>")
-util.nmap("<C-k>", "<C-u>")
-util.vmap("<C-j>", "<C-d>")
-util.vmap("<C-k>", "<C-u>")
 
 -- vim.cmd.colorscheme "catppuccin"
 

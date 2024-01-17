@@ -11,5 +11,9 @@ return {
   },
   { 'onsails/lspkind.nvim', },
   "andymass/vim-matchup",
-  { "lukas-reineke/indent-blankline.nvim", main = "ibl", opts = {} }
+  { "lukas-reineke/indent-blankline.nvim", main = "ibl", opts = {} },
+  {
+    "fdschmidt93/telescope-egrepify.nvim",
+    dependencies = { "nvim-telescope/telescope.nvim", "nvim-lua/plenary.nvim" }
+  },
 }

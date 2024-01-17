@@ -15,18 +15,18 @@ return {
         command = "set filetype=markdown"
       })
 
-      vim.api.nvim_create_autocmd({'TextChanged', 'TextChangedI'}, {
-        callback = function(e)
-          if vim.g.timer_started == true then
-            return
-          end
-          vim.g.timer_started = true
-          vim.fn.timer_start(1000, function()
-            vim.g.timer_started = false
-            vim.cmd.write()
-          end)
-        end
-      })
+      -- vim.api.nvim_create_autocmd({'TextChanged', 'TextChangedI'}, {
+      --   callback = function(e)
+      --     if vim.g.timer_started == true then
+      --       return
+      --     end
+      --     vim.g.timer_started = true
+      --     vim.fn.timer_start(1000, function()
+      --       vim.g.timer_started = false
+      --       vim.cmd.write()
+      --     end)
+      --   end
+      -- })
 
       -- FIXME does not work
       --vim.api.nvim_create_autocmd('BufEnter', {

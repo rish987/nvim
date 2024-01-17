@@ -23,18 +23,19 @@ return {
             },
           }
         },
-        ["fennel_language_server"] = {
-          fennel = {
-            workspace = {
-              -- If you are using hotpot.nvim or aniseed,
-              -- make the server aware of neovim runtime files.
-              library = vim.api.nvim_list_runtime_paths(),
-            },
-          }
-        },
+
+        -- ["fennel_language_server"] = {
+        --   fennel = {
+        --     workspace = {
+        --       -- If you are using hotpot.nvim or aniseed,
+        --       -- make the server aware of neovim runtime files.
+        --       library = vim.api.nvim_list_runtime_paths(),
+        --     },
+        --   }
+        -- },
       }
 
-      local servers = { "lua_ls", "rust_analyzer", "clangd", "clojure_lsp", "texlab", "fennel_language_server"}
+      local servers = { "lua_ls", "rust_analyzer", "clangd", "clojure_lsp", "texlab", "fennel_ls"}
       for _, server in ipairs(servers) do
         local opts = {}
 

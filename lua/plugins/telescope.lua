@@ -24,15 +24,16 @@ return {
   {
     "nvim-telescope/telescope.nvim",
     init = function (_)
-      vim.keymap.set("n", "<leader>fp", function() require("telescope.builtin").planets() end)
+      vim.keymap.set("n", "<leader>fp", function() require("telescope.builtin").planets({show_pluto = true, show_moon = true}) end)
       vim.keymap.set("n", "<leader>ff", function() require("telescope.builtin").find_files() end)
-      vim.keymap.set("n", "<leader>fg", function() require("telescope.builtin").live_grep() end)
+      vim.keymap.set("n", "<leader>fg", function() require("telescope").extensions.egrepify.egrepify {} end)
       vim.keymap.set("n", "<leader>fb", function() require("telescope.builtin").buffers() end)
       vim.keymap.set("n", "<leader>fh", function() require("telescope.builtin").help_tags() end)
       vim.keymap.set("n", "<leader>f:", function() require("telescope.builtin").command_history() end)
       vim.keymap.set("n", "<leader>f/", function() require("telescope.builtin").search_history() end)
       vim.keymap.set("n", "<leader>fo", function() require("telescope.builtin").oldfiles({cwd_only = true}) end)
       vim.keymap.set("n", "<leader>fs", function() require("telescope.builtin").lsp_dynamic_workspace_symbols() end)
+      vim.keymap.set("n", "<leader>f<Tab>", function() require("telescope.builtin").resume() end)
 
       vim.keymap.set("n", "<leader>fz", require("telescope").extensions.zoxide.list)
       vim.keymap.set("n", "<leader>ft", require("telescope").extensions["telescope-tabs"].list_tabs)
@@ -41,6 +42,7 @@ return {
       require"telescope".setup(opts)
 
       require"telescope".load_extension('zoxide')
+      require "telescope".load_extension "egrepify"
     end,
     opts = {
       defaults = {
