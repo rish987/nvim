@@ -24,6 +24,7 @@ vim.o.softtabstop=2
 vim.o.tabstop=2
 vim.o.shiftwidth=2
 vim.o.mouse = ""
+vim.o.exrc = true
 
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not vim.loop.fs_stat(lazypath) then
@@ -72,6 +73,42 @@ require("lazy").setup("plugins",
 
 --require"vim.lsp.log".set_level("debug")
 require("multifun")
+
+local ran_local_cfg = {}
+
+-- TODO override default exrc behavior to this
+vim.api.nvim_create_autocmd("DirChanged", {
+  callback = function ()
+    local dir = vim.fn.expand("<afile>")
+    local config = vim.fn.glob(dir .. "/.nvim.lua")
+    if ran_local_cfg[dir] then return end
+    if config ~= "" then
+      local orig_map = vim.keymap.set
+
+      vim.keymap.set = function (mode, lhs, rhs, opts)
+        local bufs_set = {}
+        vim.api.nvim_create_autocmd("BufRead", {
+          callback = function ()
+            local file = vim.api.nvim_buf_get_name(0)
+            if file:match(dir) then -- FIXME better match
+              if bufs_set[file] then return end
+              -- print("CUSTOM MAP: ", lhs, file, bufs_set[file])
+              opts = opts or {}
+              opts.buffer = true
+              orig_map(mode, lhs, rhs, opts)
+              bufs_set[file] = true
+            end
+          end
+        })
+      end
+
+      vim.cmd("luafile " .. config)
+
+      vim.keymap.set = orig_map
+    end
+    ran_local_cfg[dir] = true
+  end
+})
 
 -- vim.cmd.colorscheme "catppuccin"
 

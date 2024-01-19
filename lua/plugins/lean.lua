@@ -36,7 +36,7 @@ return {
             support_hop = true,
             --width = 120,
             width = 60,
-            autoopen = true,
+            autoopen = false,
             indicators = "auto",
             separate_tab = false
         },

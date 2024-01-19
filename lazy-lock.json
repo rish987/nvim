@@ -28,6 +28,7 @@
   "nvim-tree.lua": { "branch": "master", "commit": "aaee4cd896b74f85a81bed7eef2db7869960c4d0" },
   "nvim-web-devicons": { "branch": "master", "commit": "3af745113ea537f58c4b1573b64a429fefad9e07" },
   "nvimux": { "branch": "master", "commit": "a2cd0cab0acf6c37d999e0cfd199a9fa126a8dcf" },
+  "overseer.nvim": { "branch": "master", "commit": "68a2d344cea4a2e11acfb5690dc8ecd1a1ec0ce0" },
   "plenary.nvim": { "branch": "master", "commit": "50012918b2fc8357b87cff2a7f7f0446e47da174" },
   "resession.nvim": { "branch": "master", "commit": "b0107dc2cec1f24cf5a90a794a652eb66178ad8e" },
   "tabby.nvim": { "branch": "main", "commit": "9e537762cbb7647357eab22c61c7c5dda00138dd" },
