@@ -50,6 +50,7 @@ require("lazy").setup("plugins",
         "hrsh7th/cmp-buffer",
         "ggandor/leap.nvim",
         "Julian/lean.nvim",
+        "stevearc/overseer.nvim",
       }, -- For example {"folke"}
       fallback = false, -- Fallback to git when local plugin doesn't exist
     },
@@ -77,18 +78,25 @@ require("multifun")
 local ran_local_cfg = {}
 
 -- TODO override default exrc behavior to this
-vim.api.nvim_create_autocmd("DirChanged", {
+vim.api.nvim_create_autocmd("BufRead", {
   callback = function ()
-    local dir = vim.fn.expand("<afile>")
-    local config = vim.fn.glob(dir .. "/.nvim.lua")
+    local cfgs = vim.fs.find('.nvim.lua', {
+      upward = true,
+      stop = vim.loop.os_homedir(),
+      path = vim.fs.dirname(vim.api.nvim_buf_get_name(0)),
+    })
+    if #cfgs == 0 then return end
+    local config = cfgs[1]
+
+    local dir = vim.fn.fnamemodify(config, ":h")
+
     if ran_local_cfg[dir] then return end
     if config ~= "" then
       local orig_map = vim.keymap.set
-
       vim.keymap.set = function (mode, lhs, rhs, opts)
         local bufs_set = {}
-        vim.api.nvim_create_autocmd("BufRead", {
-          callback = function ()
+        local set_map_buf =
+          function ()
             local file = vim.api.nvim_buf_get_name(0)
             if file:match(dir) then -- FIXME better match
               if bufs_set[file] then return end
@@ -99,6 +107,13 @@ vim.api.nvim_create_autocmd("DirChanged", {
               bufs_set[file] = true
             end
           end
+
+        -- set for the buffer that invoked the config
+        set_map_buf()
+
+        -- set for any newly opened buffers under this directory
+        vim.api.nvim_create_autocmd("BufRead", {
+          callback = set_map_buf
         })
       end
 

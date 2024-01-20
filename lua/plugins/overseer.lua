@@ -5,5 +5,10 @@ return {
                 -- need some flag to detect if within lazy require call (and abort vim.keymap override if so)
   keys = {
     { "<leader>T", "<cmd>OverseerToggle<cr>", desc = "" },
+  },
+  task_win = {
+    win_opts = {
+      wrap = false
+    }
   }
 }
