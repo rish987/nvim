@@ -46,11 +46,11 @@ require("lazy").setup("plugins",
       path = "~/plugins",
       ---@type string[] plugins that match these patterns will use your local versions instead of being fetched from GitHub
       patterns = {
-        "hrsh7th/nvim-cmp",
-        "hrsh7th/cmp-buffer",
-        "ggandor/leap.nvim",
-        "Julian/lean.nvim",
-        "stevearc/overseer.nvim",
+        -- "hrsh7th/nvim-cmp",
+        -- "hrsh7th/cmp-buffer",
+        -- "ggandor/leap.nvim",
+        -- "Julian/lean.nvim",
+        -- "stevearc/overseer.nvim",
       }, -- For example {"folke"}
       fallback = false, -- Fallback to git when local plugin doesn't exist
     },
