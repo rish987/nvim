@@ -32,71 +32,95 @@ return {
       vim.keymap.set("n", "<leader>f:", function() require("telescope.builtin").command_history() end)
       vim.keymap.set("n", "<leader>f/", function() require("telescope.builtin").search_history() end)
       vim.keymap.set("n", "<leader>fo", function() require("telescope.builtin").oldfiles({cwd_only = true}) end)
+      vim.keymap.set("n", "<leader>fO", function() require("telescope.builtin").oldfiles({cwd_only = false}) end)
       vim.keymap.set("n", "<leader>fs", function() require("telescope.builtin").lsp_dynamic_workspace_symbols() end)
       vim.keymap.set("n", "<leader>f<Tab>", function() require("telescope.builtin").resume() end)
+      vim.keymap.set("n", "<leader>fr", function() require'telescope'.extensions.repo.list{} end)
 
       vim.keymap.set("n", "<leader>fz", require("telescope").extensions.zoxide.list)
       vim.keymap.set("n", "<leader>ft", require("telescope").extensions["telescope-tabs"].list_tabs)
     end,
     config = function (_, opts)
-      require"telescope".setup(opts)
+      local telescope = require"telescope"
+      telescope.setup(opts)
 
-      require"telescope".load_extension('zoxide')
-      require "telescope".load_extension "egrepify"
+      telescope.load_extension'zoxide'
+      telescope.load_extension'egrepify'
+      telescope.load_extension'repo'
     end,
-    opts = {
-      defaults = {
-        mappings = {
-          n = {
-            ["K"] = function() require"telescope.actions".select_default() end,
-            ["S"] = function (prompt_bufnr)
-              require('leap').leap {
-                targets = get_telescope_targets(prompt_bufnr),
-                action = function (target)
-                  target.pick:set_selection(target.row)
-                end
-              }
-            end,
-            ["s"] = function (prompt_bufnr)
-              require('leap').leap {
-                targets = get_telescope_targets(prompt_bufnr),
-                action = function (target)
-                  target.pick:set_selection(target.row)
-                  require"telescope.actions".select_default(prompt_bufnr)
-                end
-              }
-            end
-          }
-        },
-        color_devicons=true,
-        initial_mode = "normal"
-      },
-      pickers = {
-        oldfiles = {
+    opts = function ()
+      local actions = require"telescope.actions"
+      return {
+        defaults = {
           mappings = {
             n = {
-            }
-          }
-        },
-      },
-      extensions = {
-        zoxide = {
-          mappings = {
-            default = {
-              action = function(selection)
-                vim.cmd.tcd(selection.path)
-              end
-            },
-            ["<C-t>"] = {
-              action = function(selection)
-                vim.cmd.tabnew()
-                vim.cmd.tcd(selection.path)
+              ["K"] = function() actions.select_default() end,
+              ["S"] = function (prompt_bufnr)
+                require('leap').leap {
+                  targets = get_telescope_targets(prompt_bufnr),
+                  action = function (target)
+                    target.pick:set_selection(target.row)
+                  end
+                }
               end,
+              ["s"] = function (prompt_bufnr)
+                require('leap').leap {
+                  targets = get_telescope_targets(prompt_bufnr),
+                  action = function (target)
+                    target.pick:set_selection(target.row)
+                    actions.select_default(prompt_bufnr)
+                  end
+                }
+              end,
+
+              ["<C-k>"] = actions.preview_scrolling_up,
+              ["<C-j>"] = actions.preview_scrolling_down,
+
+              ["<C-u>"] = actions.results_scrolling_up,
+              ["<C-d>"] = actions.results_scrolling_down,
+            }
+          },
+          color_devicons=true,
+          initial_mode = "normal"
+        },
+        pickers = {
+          oldfiles = {
+            mappings = {
+              n = {
+              }
+            }
+          },
+        },
+        extensions = {
+          repo = {
+            list = {
+              -- fd_opts = {
+              --   "--no-ignore-vcs",
+              -- },
+              search_dirs = {
+                "~/projects",
+                "~/plugins",
+              },
+            },
+          },
+          zoxide = {
+            mappings = {
+              default = {
+                action = function(selection)
+                  vim.cmd.tcd(selection.path)
+                end
+              },
+              ["<C-t>"] = {
+                action = function(selection)
+                  vim.cmd.tabnew()
+                  vim.cmd.tcd(selection.path)
+                end,
+              },
             },
           },
         },
-      },
-    }
+      }
+    end,
   },
   {
     "LukasPietzschmann/telescope-tabs",
@@ -111,4 +135,5 @@ return {
     }
   },
   "jvgrootveld/telescope-zoxide",
+  "cljoly/telescope-repo.nvim",
 }

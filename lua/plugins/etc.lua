@@ -16,4 +16,10 @@ return {
     "fdschmidt93/telescope-egrepify.nvim",
     dependencies = { "nvim-telescope/telescope.nvim", "nvim-lua/plenary.nvim" }
   },
+  {
+    "airblade/vim-rooter",
+    config = function ()
+      vim.g.rooter_cd_cmd = 'tcd'
+    end,
+  }
 }
