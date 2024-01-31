@@ -7,6 +7,7 @@ return {
     end,
     opts = {
       sections = {
+        lualine_c = {{'filename', path = 1}},
         lualine_x = {
           {
             require("lazy.status").updates,

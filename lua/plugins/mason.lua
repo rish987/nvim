@@ -1,6 +1,7 @@
 return {
   {
     "williamboman/mason.nvim",
+    priority = 10000,
     build = ":MasonUpdate", -- :MasonUpdate updates registry contents
     lazy = false,
     init = function ()
