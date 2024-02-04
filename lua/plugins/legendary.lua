@@ -39,6 +39,8 @@ return {
       {"<C-k>", "<C-u>"},
       {'[d', '<cmd>lua vim.diagnostic.goto_prev()<CR>'}, -- TODO make buffer-specific again (here temporarily for better-n to work)
       {']d', '<cmd>lua vim.diagnostic.goto_next()<CR>'},
+      {'Z', 'z'},
+      {'ZZ', 'zz'},
     }
   }
 }

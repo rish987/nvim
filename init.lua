@@ -50,7 +50,7 @@ require("lazy").setup("plugins",
         -- "hrsh7th/cmp-buffer",
         "ggandor/leap.nvim",
         -- "Julian/lean.nvim",
-        "jonatan-branting/nvim-better-n",
+        -- "jonatan-branting/nvim-better-n",
         "stevearc/overseer.nvim",
       }, -- For example {"folke"}
       fallback = false, -- Fallback to git when local plugin doesn't exist

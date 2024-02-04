@@ -17,7 +17,7 @@ return {
               callSnippet = 'Replace',
             },
             diagnostics = {
-              disable = {"duplicate-set-field", "duplicate-doc-field"},
+              disable = {"duplicate-set-field", "duplicate-doc-field", "missing-fields"},
               -- Get the language server to recognize the `vim` global
               globals = {
                 'vim',
