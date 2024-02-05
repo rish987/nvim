@@ -36,6 +36,10 @@ return {
       vim.keymap.set("n", "<leader>fs", function() require("telescope.builtin").lsp_dynamic_workspace_symbols() end)
       vim.keymap.set("n", "<leader>f<Tab>", function() require("telescope.builtin").resume() end)
       vim.keymap.set("n", "<leader>fr", function() require'telescope'.extensions.repo.list{} end)
+      vim.keymap.set("n", "<leader>fu", function() require'telescope'.extensions.undo.undo{
+        side_by_side = true,
+        diff_context_lines = 5,
+      } end)
 
       vim.keymap.set("n", "<leader>fz", require("telescope").extensions.zoxide.list)
       vim.keymap.set("n", "<leader>ft", require("telescope").extensions["telescope-tabs"].list_tabs)
@@ -73,11 +77,24 @@ return {
                 }
               end,
 
-              ["<C-k>"] = actions.preview_scrolling_up,
-              ["<C-j>"] = actions.preview_scrolling_down,
+              ["<C-k>"] = actions.move_selection_previous,
+              ["<C-j>"] = actions.move_selection_next,
 
-              ["<C-u>"] = actions.results_scrolling_up,
-              ["<C-d>"] = actions.results_scrolling_down,
+              ["<C-u>"] = actions.preview_scrolling_up,
+              ["<C-d>"] = actions.preview_scrolling_down,
+
+              ["<C-p>"] = actions.results_scrolling_up,
+              ["<C-n>"] = actions.results_scrolling_down,
+            },
+            i = {
+              ["<C-k>"] = actions.move_selection_previous,
+              ["<C-j>"] = actions.move_selection_next,
+
+              ["<C-u>"] = actions.preview_scrolling_up,
+              ["<C-d>"] = actions.preview_scrolling_down,
+
+              ["<C-p>"] = actions.results_scrolling_up,
+              ["<C-n>"] = actions.results_scrolling_down,
             }
           },
           color_devicons=true,
@@ -137,4 +154,5 @@ return {
   },
   "jvgrootveld/telescope-zoxide",
   "cljoly/telescope-repo.nvim",
+  "debugloop/telescope-undo.nvim",
 }

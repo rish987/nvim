@@ -34,6 +34,14 @@ local on_attach = function(client, bufnr)
       augroup END
     ]], false)
   end
+
+  local better_n = require"better-n"
+  local diag = better_n.create({previous = vim.diagnostic.goto_prev, next = vim.diagnostic.goto_next})
+
+  vim.keymap.set({ "n", "x" }, "[d", diag.previous, {buffer = true})
+  vim.keymap.set({ "n", "x" }, "]d", diag.next, {buffer = true})
 end
+
+vim.diagnostic.config{virtual_text = false}
 
 return { on_attach = on_attach }
