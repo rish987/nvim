@@ -41,6 +41,7 @@ return {
       {']d', '<cmd>lua vim.diagnostic.goto_next()<CR>'},
       {'Z', 'z'},
       {'ZZ', 'zz'},
+      {'GG', 'G'},
     }
   }
 }
