@@ -41,6 +41,8 @@ return {
         diff_context_lines = 5,
       } end)
 
+      vim.keymap.set("n", "<leader>fm", "<Cmd>Noice telescope<CR>")
+
       vim.keymap.set("n", "<leader>fz", require("telescope").extensions.zoxide.list)
       vim.keymap.set("n", "<leader>ft", require("telescope").extensions["telescope-tabs"].list_tabs)
     end,
@@ -51,6 +53,7 @@ return {
       telescope.load_extension'zoxide'
       telescope.load_extension'egrepify'
       telescope.load_extension'repo'
+      telescope.load_extension'noice'
     end,
     opts = function ()
       local actions = require"telescope.actions"

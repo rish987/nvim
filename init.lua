@@ -151,6 +151,7 @@ vim.cmd([[
   
   set guifont=DejaVuSansM\ Nerd\ Font\ Mono:h8:i
   set mouse=a
+  set undofile
 
   nnoremap gp `[v`]
 ]])
