@@ -4,7 +4,7 @@ return {
         require('lspsaga').setup({})
     end,
     init = function ()
-      vim.keymap.set('n', 'gk', '<cmd>Lspsaga hover_doc ++keep<CR>')
+      vim.keymap.set('n', '<leader>k', '<cmd>Lspsaga hover_doc ++keep<CR>')
     end,
     dependencies = {
         'nvim-treesitter/nvim-treesitter', -- optional

@@ -7,8 +7,6 @@ return {
     vim.keymap.set('n', 'Q', "q")
     vim.keymap.set('n', '<leader>q', "Q")
     vim.keymap.set('n', 'q', require("bufferline").pick)
-    vim.keymap.set('n', '<C-m>', vim.cmd.bprevious)
-    vim.keymap.set('n', '<C-b>', vim.cmd.bnext)
     vim.api.nvim_create_autocmd({"DirChanged"},
     {
       callback = function (info) require("bufferline.tabpages").rename_tab(vim.api.nvim_get_current_tabpage(), vim.fn.fnamemodify(info.file, ":t"))  end,
@@ -23,6 +21,16 @@ return {
       tab_selected = {
         fg = "White"
       }
+    },
+    options = {
+      offsets = {
+        {
+          filetype = "NvimTree",
+          text = "File Explorer",
+          text_align = "left",
+          separator = true
+        }
+      },
     }
   },
   version = "*",
