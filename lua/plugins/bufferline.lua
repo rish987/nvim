@@ -15,6 +15,22 @@ return {
     {
       callback = function () require("bufferline.tabpages").rename_tab(vim.api.nvim_get_current_tabpage(), vim.fn.fnamemodify(vim.loop.cwd(), ":t"))  end,
     })
+    local exclude_subdirs = {".lake"}
+    vim.api.nvim_create_autocmd({"BufEnter"},
+    {
+      callback = function (info)
+          local ignore = not info.file:match(vim.loop.cwd())
+          if not ignore then
+            for _, dir in ipairs(exclude_subdirs) do
+              if info.file:match(vim.loop.cwd() .. "/" .. dir) then
+                ignore = true
+                break
+              end
+            end
+          end
+          if ignore then vim.api.nvim_buf_set_option(0, "buflisted", false) end
+        end,
+    })
   end,
   opts = {
     highlights = {

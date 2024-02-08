@@ -28,7 +28,18 @@ return {
       vim.keymap.set("n", "<leader>ff", function() require("telescope.builtin").find_files() end)
       vim.keymap.set("n", "<leader>fg", function() require("telescope").extensions.egrepify.egrepify {} end)
       vim.keymap.set("n", "<leader>fb", function() require("telescope.builtin").buffers() end)
-      vim.keymap.set("n", "<leader>fh", function() require("telescope.builtin").help_tags() end)
+      vim.keymap.set("n", "<leader>fh", function() require("telescope.builtin").help_tags({
+        -- attach_mappings = function(_)
+        --   local actions = require "telescope.actions"
+        --   local action_state = require "telescope.actions.state"
+        --   actions.select_default:replace(function()
+        --     local selection = action_state.get_selected_entry()
+        --     vim.cmd("FloatingHelp " .. selection.display)
+        --   end)
+        --
+        --   return true
+        -- end,
+      }) end)
       vim.keymap.set("n", "<leader>f:", function() require("telescope.builtin").command_history() end)
       vim.keymap.set("n", "<leader>f/", function() require("telescope.builtin").search_history() end)
       vim.keymap.set("n", "<leader>fo", function() require("telescope.builtin").oldfiles({cwd_only = true}) end)

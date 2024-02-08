@@ -52,6 +52,7 @@ require("lazy").setup("plugins",
         -- "Julian/lean.nvim",
         -- "jonatan-branting/nvim-better-n",
         "stevearc/overseer.nvim",
+        "akinsho/bufferline.nvim",
       }, -- For example {"folke"}
       fallback = false, -- Fallback to git when local plugin doesn't exist
     },
@@ -126,6 +127,30 @@ vim.api.nvim_create_autocmd("BufRead", {
   end
 })
 
+local help_open = false
+
+vim.api.nvim_create_autocmd("BufEnter", {
+  callback = function (_)
+    if vim.o.ft == "help" and not help_open then
+      vim.cmd.wincmd"L"
+      vim.cmd("vert resize 80")
+      vim.cmd("set winfixwidth")
+      -- require"nvim-tree.api".tree.close()
+      help_open = true
+    end
+  end
+})
+
+-- vim.api.nvim_create_autocmd("BufWinLeave", {
+--   callback = function (_)
+--     print(vim.o.ft)
+--     if vim.o.ft == "help" and help_open then
+--       require"nvim-tree.api".tree.open()
+--       help_open = false
+--     end
+--   end
+-- })
+
 -- vim.cmd.colorscheme "catppuccin"
 
 vim.cmd([[
@@ -138,8 +163,6 @@ vim.cmd([[
   autocmd FileType rust set tabstop=2
   autocmd FileType tex set shiftwidth=2
   autocmd FileType tex set tabstop=2
-
-  autocmd! FileType help :wincmd H | :vert resize 90 " open help window vertically
 
   autocmd TermOpen * setlocal nonumber
 

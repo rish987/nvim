@@ -20,11 +20,14 @@ return {
     "airblade/vim-rooter",
     config = function ()
       vim.g.rooter_cd_cmd = 'tcd'
-      vim.g.rooter_patterns = {'.git'}
+      vim.g.rooter_patterns = {'!^.lake', '.git'}
     end,
   },
   {
     "tiagovla/scope.nvim",
     init = function() require"scope".setup{} end
   },
+  {
+    "famiu/bufdelete.nvim"
+  }
 }
