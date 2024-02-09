@@ -16,13 +16,13 @@ return {
     "fdschmidt93/telescope-egrepify.nvim",
     dependencies = { "nvim-telescope/telescope.nvim", "nvim-lua/plenary.nvim" }
   },
-  {
-    "airblade/vim-rooter",
-    config = function ()
-      vim.g.rooter_cd_cmd = 'tcd'
-      vim.g.rooter_patterns = {'!^.lake', '.git'}
-    end,
-  },
+  -- {
+  --   "airblade/vim-rooter",
+  --   config = function ()
+  --     vim.g.rooter_cd_cmd = 'tcd'
+  --     vim.g.rooter_patterns = {'!^.lake', '.git'}
+  --   end,
+  -- },
   {
     "tiagovla/scope.nvim",
     init = function() require"scope".setup{} end

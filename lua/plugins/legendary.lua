@@ -41,6 +41,7 @@ return {
       {'ZZ', 'zz'},
       {'GG', 'G'},
       {"<C-h>", "<C-^>"},
+      {"gh", "g<Tab>"},
       {"<leader>D", "<Cmd>Bdelete<CR>"},
       {"<leader>n", "n"}, -- to get around better-n when necessary
       {"	", "<Cmd>bn<CR>"},
