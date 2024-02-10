@@ -143,6 +143,14 @@ vim.api.nvim_create_autocmd("BufEnter", {
   end
 })
 
+vim.api.nvim_create_autocmd("WinClosed", {
+    nested = true,
+    callback = function(args)
+      if vim.api.nvim_get_current_win() ~= tonumber(args.match) then return end
+      vim.cmd.wincmd "p"
+    end,
+  })
+
 -- vim.api.nvim_create_autocmd("BufWinLeave", {
 --   callback = function (_)
 --     print(vim.o.ft)

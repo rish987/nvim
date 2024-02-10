@@ -10,6 +10,9 @@ return {
 
       local lspconfig = require "lspconfig"
 
+      local library = vim.api.nvim_get_runtime_file("", true)
+      vim.list_extend(library, {"~/.local/share/nvim/lazy/plenary.nvim/lua"})
+
       local settings_override = {
         ["lua_ls"] = {
           Lua = {
@@ -30,7 +33,7 @@ return {
             },
             workspace = {
               -- Make the server aware of Neovim runtime files
-              library = vim.api.nvim_get_runtime_file("", true),
+              library = library,
               checkThirdParty = false,
             },
           }
