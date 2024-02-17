@@ -30,6 +30,7 @@ return {
       -- {"<leader>yy", "<Cmd>call writefile(getreg('\"', 1, 1), \"/home/pugobat11144/temp\", \"S\")<CR>"},
       -- {"<leader>cp", "<Cmd>let @\" = expand(\"%\")<CR>"},
       {"<leader>o", "<Cmd>mes<CR>"},
+      {"<leader>N", "<Cmd>Noice<CR>"},
       -- {"<leader>k", "<Cmd>set winfixheight<CR>"},
       {"<leader>h", "<Cmd>set winfixwidth<CR>"},
       {"<C-j>", "<C-d>"},

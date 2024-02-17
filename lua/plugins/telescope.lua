@@ -47,6 +47,12 @@ return {
       vim.keymap.set("n", "<leader>fs", function() require("telescope.builtin").lsp_dynamic_workspace_symbols() end)
       vim.keymap.set("n", "<leader>f<Tab>", function() require("telescope.builtin").resume() end)
       vim.keymap.set("n", "<leader>fr", function() require'telescope'.extensions.repo.list{} end)
+      vim.keymap.set("n", "<leader>fl", function() require'telescope'.extensions.repo.list
+        {
+          search_dirs = {
+            "~/.local/share/nvim/lazy/",
+          },
+        } end)
       vim.keymap.set("n", "<leader>fu", function() require'telescope'.extensions.undo.undo{
         side_by_side = true,
         diff_context_lines = 5,

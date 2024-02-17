@@ -65,6 +65,14 @@ require("lazy").setup("plugins",
     },
   })
 
+vim.api.nvim_create_autocmd("WinClosed", {
+  nested = true,
+  callback = function(args)
+    if vim.api.nvim_get_current_win() ~= tonumber(args.match) then return end
+    vim.cmd.wincmd "p"
+  end,
+})
+
 -- -- auto-close quickfix/location after leaving it
 -- au("WinLeave", function(_)
 --   local winid = vim.api.nvim_get_current_win()
@@ -78,6 +86,28 @@ require("lazy").setup("plugins",
 
 --require"vim.lsp.log".set_level("debug")
 require("multifun")
+
+require("alternate")
+
+local locations_to_items = vim.lsp.util.locations_to_items
+vim.lsp.util.locations_to_items = function (locations, offset_encoding)
+  local newLocations = {}
+  local lines = {}
+  local loc_i = 1
+  for _, loc in ipairs(locations) do
+    local uri = loc.uri or loc.targetUri
+    local range = loc.range or loc.targetSelectionRange
+    if not lines[uri .. range.start.line] then
+      table.insert(newLocations, loc)
+      loc_i = loc_i + 1
+    else -- already have a location on this line
+      table.remove(locations, loc_i) -- also remove from the original list
+    end
+    lines[uri .. range.start.line] = true
+  end
+
+  return locations_to_items(newLocations, offset_encoding)
+end
 
 local ran_local_cfg = {}
 
