@@ -47,6 +47,7 @@ return {
       vim.keymap.set("n", "<leader>fs", function() require("telescope.builtin").lsp_dynamic_workspace_symbols() end)
       vim.keymap.set("n", "<leader>f<Tab>", function() require("telescope.builtin").resume() end)
       vim.keymap.set("n", "<leader>fr", function() require'telescope'.extensions.repo.list{} end)
+      vim.keymap.set("n", "<leader>fn", "<Cmd>Noice telescope<CR>")
       vim.keymap.set("n", "<leader>fl", function() require'telescope'.extensions.repo.list
         {
           search_dirs = {

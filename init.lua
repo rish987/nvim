@@ -94,7 +94,7 @@ vim.lsp.util.locations_to_items = function (locations, offset_encoding)
   local newLocations = {}
   local lines = {}
   local loc_i = 1
-  for _, loc in ipairs(locations) do
+  for _, loc in ipairs(vim.deepcopy(locations)) do
     local uri = loc.uri or loc.targetUri
     local range = loc.range or loc.targetSelectionRange
     if not lines[uri .. range.start.line] then

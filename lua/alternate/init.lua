@@ -24,7 +24,8 @@ end
 
 function M.alt_action(cmd)
   return function ()
-    if not altwin or not vim.api.nvim_win_is_valid(altwin) then return end
+    M.get_altwin()
+    if not altwin then return end
 
     vim.api.nvim_win_call(altwin, function()
       vim.cmd(cmd)
@@ -34,7 +35,8 @@ end
 
 function M.alt_scroll(direction, speed)
   return function ()
-    if not altwin or not vim.api.nvim_win_is_valid(altwin) then return end
+    M.get_altwin()
+    if not altwin then return end
 
     speed = speed or vim.api.nvim_win_get_height(altwin) / 2
 

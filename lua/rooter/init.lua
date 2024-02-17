@@ -1,6 +1,8 @@
 -- Array of file names indicating root directory. Modify to your liking.
 local root_names = { '.git' }
 local excluded_root_names = { '.lake' }
+local ignore_filetypes = { 'NvimTree', 'help' }
+local ignore_buftypes = { 'nofile', 'prompt', 'popup', 'terminal' }
 
 -- Cache to use for speed up (at cost of possibly outdated results)
 local root_cache = {}
@@ -10,6 +12,9 @@ local tcd_set = {}
 
 local set_root = function()
   if tcd_set[vim.api.nvim_get_current_tabpage()] then return end -- don't set tabpage directory more than once
+  if vim.tbl_contains(ignore_buftypes, vim.bo.buftype) or vim.tbl_contains(ignore_filetypes, vim.bo.filetype) then
+    return
+  end
 
   -- Get directory path to start search from
   local path = vim.api.nvim_buf_get_name(0)
