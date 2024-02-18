@@ -19,7 +19,6 @@ return {
       },
     },
     init = function ()
-      local new_tree = false
       vim.api.nvim_create_autocmd({"TabNew", "VimEnter"},
       {
         callback = function ()
@@ -31,7 +30,7 @@ return {
         callback = function()
           local tree_wins = {}
           local floating_wins = {}
-          local wins = vim.api.nvim_list_wins()
+          local wins = vim.api.nvim_tabpage_list_wins(0)
           for _, w in ipairs(wins) do
             local bufname = vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(w))
             if bufname:match("NvimTree_") ~= nil then
@@ -41,6 +40,7 @@ return {
               table.insert(floating_wins, w)
             end
           end
+          print( #wins , #floating_wins , #tree_wins )
           if 1 == #wins - #floating_wins - #tree_wins then
             -- Should quit, so we close all invalid windows.
             for _, w in ipairs(tree_wins) do

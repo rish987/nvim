@@ -36,8 +36,10 @@ return {
               ["ia"] = "@assignment.inner",
               ["sl"] = "@assignment.lhs",
               ["sr"] = "@assignment.rhs",
-              ["ac"] = "@conditional.outer",
-              ["ic"] = { query = "@conditional.inner", desc = "Select inner part of a conditional" },
+              ["at"] = "@conditional.outer",
+              ["it"] = { query = "@conditional.inner", desc = "Select inner part of a conditional" },
+              ["ac"] = "@call.outer",
+              ["ic"] = "@call.inner",
             },
             -- You can choose the select mode (default is charwise 'v')
             --

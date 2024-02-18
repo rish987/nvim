@@ -63,6 +63,7 @@ return {
 
       vim.keymap.set("n", "<leader>fz", require("telescope").extensions.zoxide.list)
       vim.keymap.set("n", "<leader>ft", require("telescope").extensions["telescope-tabs"].list_tabs)
+      vim.keymap.set("n", "<leader>fy", require("telescope").extensions.yank_history.yank_history)
     end,
     config = function (_, opts)
       local telescope = require"telescope"
@@ -72,6 +73,7 @@ return {
       telescope.load_extension'egrepify'
       telescope.load_extension'repo'
       telescope.load_extension'noice'
+      telescope.load_extension'yank_history'
     end,
     opts = function ()
       local actions = require"telescope.actions"
