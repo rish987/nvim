@@ -24,7 +24,7 @@ return {
   {
     "nvim-telescope/telescope.nvim",
     init = function (_)
-      vim.keymap.set("n", "<leader>fp", function() require("telescope.builtin").planets({show_pluto = true, show_moon = true}) end)
+      vim.keymap.set("n", "<leader>f?", function() require("telescope.builtin").planets({show_pluto = true, show_moon = true}) end)
       vim.keymap.set("n", "<leader>ff", function() require("telescope.builtin").find_files() end)
       vim.keymap.set("n", "<leader>fg", function() require("telescope").extensions.egrepify.egrepify {} end)
       vim.keymap.set("n", "<leader>fb", function() require("telescope.builtin").buffers() end)
@@ -46,6 +46,7 @@ return {
       vim.keymap.set("n", "<leader>fO", function() require("telescope.builtin").oldfiles({cwd_only = false}) end)
       vim.keymap.set("n", "<leader>fs", function() require("telescope.builtin").lsp_dynamic_workspace_symbols() end)
       vim.keymap.set("n", "<leader>f<Tab>", function() require("telescope.builtin").resume() end)
+      vim.keymap.set("n", "<leader>fp", function() require("telescope.builtin").pickers() end)
       vim.keymap.set("n", "<leader>fr", function() require'telescope'.extensions.repo.list{} end)
       vim.keymap.set("n", "<leader>fn", "<Cmd>Noice telescope<CR>")
       vim.keymap.set("n", "<leader>fl", function() require'telescope'.extensions.repo.list
@@ -79,6 +80,9 @@ return {
       local actions = require"telescope.actions"
       return {
         defaults = {
+          cache_picker = {
+            num_pickers = 100,
+          },
           mappings = {
             n = {
               ["K"] = function() actions.select_default() end,

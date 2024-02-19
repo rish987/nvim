@@ -10,8 +10,9 @@ vim.api.nvim_create_autocmd("WinLeave", {
   end,
 })
 
+-- TODO remember altwins on a per-tabpage basis
 function M.get_altwin()
-  if altwin and vim.api.nvim_win_is_valid(altwin) then return altwin end
+  if altwin and vim.api.nvim_win_is_valid(altwin) and vim.api.nvim_win_get_tabpage(altwin) == vim.api.nvim_get_current_tabpage() then return altwin end
 
   -- choose any other valid window as the alternate
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do

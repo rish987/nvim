@@ -1,6 +1,7 @@
 return {
   "andrewferrier/debugprint.nvim",
   opts = {
+    print_tag = "DBG"
   },
   -- Dependency only needed for NeoVim 0.8
   dependencies = {
@@ -13,16 +14,12 @@ return {
   init = function ()
     vim.keymap.set("n", "<Leader>dd", function()
       -- Note: setting `expr=true` and returning the value are essential
-      require('debugprint').debugprint()
-    end, {
-        expr = true,
-      })
+      vim.fn.feedkeys(require('debugprint').debugprint())
+    end)
     vim.keymap.set("n", "<Leader>Dd", function()
       -- Note: setting `expr=true` and returning the value are essential
-      return require('debugprint').debugprint({ above = true })
-    end, {
-        expr = true,
-      })
+      vim.fn.feedkeys(require('debugprint').debugprint({ above = true }))
+    end)
     vim.keymap.set("n", "<Leader>dq", function()
       -- Note: setting `expr=true` and returning the value are essential
       vim.fn.feedkeys(require('debugprint').debugprint({ variable = true }))

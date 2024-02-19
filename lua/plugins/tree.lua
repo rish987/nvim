@@ -19,13 +19,14 @@ return {
       },
     },
     init = function ()
-      vim.api.nvim_create_autocmd({"TabNew", "VimEnter"},
-      {
-        callback = function ()
-          require"nvim-tree.api".tree.toggle({focus = false})
-        end,
-      })
-
+      if not vim.g.started_by_firenvim == true then
+        vim.api.nvim_create_autocmd({"TabNew", "VimEnter"},
+        {
+          callback = function ()
+            require"nvim-tree.api".tree.toggle({focus = false})
+          end,
+        })
+      end
       vim.api.nvim_create_autocmd("QuitPre", {
         callback = function()
           local tree_wins = {}
