@@ -14,8 +14,10 @@ function M.get_altwin()
   if altwin and vim.api.nvim_win_is_valid(altwin) then return altwin end
 
   -- choose any other valid window as the alternate
-  for _, win in vim.api.nvim_tabpage_list_wins(0) do
-    if win ~= vim.api.nvim_get_current_win() and not vim.tbl_contains(excluded_filetypes, vim.o.ft) then
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    local floating = vim.api.nvim_win_get_config(win).relative ~= ''
+    local excluded = vim.tbl_contains(excluded_filetypes, vim.bo[vim.api.nvim_win_get_buf(win)].ft)
+    if win ~= vim.api.nvim_get_current_win() and not excluded and not floating then
       altwin = win
       return altwin
     end
@@ -33,6 +35,13 @@ function M.alt_action(cmd)
   end
 end
 
+function M.alt_goto()
+  M.get_altwin()
+  if not altwin then return end
+
+  vim.api.nvim_set_current_win(altwin)
+end
+
 function M.alt_scroll(direction, speed)
   return function ()
     M.get_altwin()
@@ -46,6 +55,8 @@ function M.alt_scroll(direction, speed)
     M.alt_action([[normal! ]] .. dist .. input)()
   end
 end
+
+vim.keymap.set("n", "<C-w><C-w>", M.alt_goto)
 
 vim.keymap.set("n", "<C-S-j>", M.alt_scroll(1))
 vim.keymap.set("n", "<C-S-k>", M.alt_scroll(-1))

@@ -3,8 +3,8 @@ return {
     'sindrets/diffview.nvim',
     dependencies = 'nvim-lua/plenary.nvim',
     init = function ()
-      vim.keymap.set({"n"}, "<leader>dd", ":DiffviewOpen<CR>")
-      vim.keymap.set({"n"}, "<leader>dc", ":DiffviewClose<CR>")
+      -- vim.keymap.set({"n"}, "<leader>dd", ":DiffviewOpen<CR>")
+      -- vim.keymap.set({"n"}, "<leader>dc", ":DiffviewClose<CR>")
     end,
     cmd = {"DiffviewOpen", "DiffviewClose"},
     opts = {

@@ -26,6 +26,15 @@ vim.o.shiftwidth=2
 vim.o.mouse = ""
 vim.o.exrc = true
 
+-- local keymap = vim.keymap.set
+-- vim.keymap.set = function(mode, lhs, rhs, opts)
+--   local new_rhs = rhs
+--   if type(rhs) == "function" then
+--     new_rhs = function() vim.schedule(rhs) end
+--   end
+--   keymap(mode, lhs, new_rhs, opts)
+-- end
+
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not vim.loop.fs_stat(lazypath) then
   vim.fn.system({
@@ -216,5 +225,5 @@ vim.cmd([[
   set mouse=a
   set undofile
 
-  nnoremap gp `[v`]
+  " nnoremap gp `[v`]
 ]])

@@ -2,8 +2,6 @@ return {
   {
     "gbrlsnchs/winpick.nvim",
     init = function ()
-      vim.keymap.set("n", "<C-w><C-w>", "<C-w><C-p>")
-
       vim.keymap.set("n", "<C-w>p", function()
         local winid =  require"winpick".select()
 

@@ -1,8 +1,12 @@
 return {
   "chrisgrieser/nvim-various-textobjs",
 	lazy = false,
-	opts = { useDefaultKeymaps = true },
+	opts = {
+    useDefaultKeymaps = true,
+    disabledKeymaps = { "g;", "gc" },
+  },
   init = function ()
+    vim.keymap.set({ "o", "x" }, "gp", "<cmd>lua require('various-textobjs').lastChange()<CR>")
     vim.keymap.set("n", "dsi", function()
       -- select outer indentation
       require("various-textobjs").indentation("outer", "outer")
