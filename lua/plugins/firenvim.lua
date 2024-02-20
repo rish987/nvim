@@ -60,8 +60,8 @@ return {
 
       vim.o.spell = true
       vim.o.spelllang = "en_us"
-      vim.b.catppuccin_dark = false
-      vim.cmd.colorscheme "catppuccin-latte"
+      vim.b.catppuccin_dark = true
+      vim.cmd.colorscheme "catppuccin-mocha"
 
       vim.keymap.set("n", "<C-x>", function()
         vim.b.catppuccin_dark = not vim.b.catppuccin_dark

@@ -9,7 +9,7 @@ return {
   opts = {
     include_builtin = true,
     keymaps = {
-      {"<leader>l", "<Cmd>Legendary<cr>"},
+      -- {"<leader>l", "<Cmd>Legendary<cr>"},
 
       {"<leader>Q", "<Cmd>qa!<cr>"},
       {"<leader>E", "<Cmd>edit<cr>"},
@@ -34,6 +34,7 @@ return {
       -- {"<leader>k", "<Cmd>set winfixheight<CR>"},
       {"<leader>h", "<Cmd>set winfixwidth<CR>"},
       {"<C-j>", "<C-d>"},
+      {"<C-i>", "<C-i>"},
       {"<C-t>", "g,"},
       {"<C-f>", "g;"},
       {"<C-k>", "<C-u>"},

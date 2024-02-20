@@ -98,6 +98,8 @@ require("multifun")
 
 require("alternate")
 
+require("jump-textobj")
+
 local locations_to_items = vim.lsp.util.locations_to_items
 vim.lsp.util.locations_to_items = function (locations, offset_encoding)
   local newLocations = {}
@@ -202,6 +204,12 @@ vim.api.nvim_create_autocmd("WinClosed", {
 
 -- vim.cmd.colorscheme "catppuccin"
 
+vim.keymap.set("n", "<leader>v", function ()
+  vim.cmd.edit(vim.v.oldfiles[1])
+end)
+
+vim.o.shada = "!,'1000,<1000,s10,h"
+
 vim.cmd([[
   autocmd FileType lean3 set shiftwidth=2
   autocmd FileType lean3 set tabstop=2
@@ -221,7 +229,8 @@ vim.cmd([[
        \   exe "normal! g`\"" |
        \ endif
   
-  set guifont=DejaVuSansM\ Nerd\ Font\ Mono:h8:i
+  set guifont=DejaVuSansM\ Nerd\ Font:h8:i
+
   set mouse=a
   set undofile
 
