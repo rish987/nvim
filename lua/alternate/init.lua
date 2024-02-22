@@ -3,7 +3,7 @@ local M = {}
 local excluded_filetypes = { "NvimTree" }
 local altwin
 vim.api.nvim_create_autocmd("WinLeave", {
-  callback = function(_)
+  callback = function()
     if not vim.tbl_contains(excluded_filetypes, vim.o.ft) then
       altwin = vim.api.nvim_get_current_win()
     end
@@ -25,13 +25,35 @@ function M.get_altwin()
   end
 end
 
-function M.alt_action(cmd)
+function M.alt_cmd(cmd)
   return function ()
     M.get_altwin()
     if not altwin then return end
 
     vim.api.nvim_win_call(altwin, function()
       vim.cmd(cmd)
+    end)
+  end
+end
+
+function M.alt_feedkeys(keys)
+  return function ()
+    M.get_altwin()
+    if not altwin then return end
+
+    vim.api.nvim_win_call(altwin, function()
+      vim.fn.feedkeys(vim.api.nvim_replace_termcodes(keys, true, true, true))
+    end)
+  end
+end
+
+function M.alt_wincmd(cmd)
+  return function ()
+    M.get_altwin()
+    if not altwin then return end
+
+    vim.api.nvim_win_call(altwin, function()
+      vim.cmd.wincmd(cmd)
     end)
   end
 end
@@ -53,7 +75,7 @@ function M.alt_scroll(direction, speed)
     local dist = math.floor(speed * direction)
     local input = direction > 0 and [[]] or [[]]
 
-    M.alt_action([[normal! ]] .. dist .. input)()
+    M.alt_cmd([[normal! ]] .. dist .. input)()
   end
 end
 
@@ -61,5 +83,6 @@ vim.keymap.set("n", "<C-w><C-w>", M.alt_goto)
 
 vim.keymap.set("n", "<C-S-j>", M.alt_scroll(1))
 vim.keymap.set("n", "<C-S-k>", M.alt_scroll(-1))
+vim.keymap.set("n", "<C-S-w>c", M.alt_wincmd("c"))
 
 return M

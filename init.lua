@@ -205,7 +205,13 @@ vim.api.nvim_create_autocmd("WinClosed", {
 -- vim.cmd.colorscheme "catppuccin"
 
 vim.keymap.set("n", "<leader>v", function ()
-  vim.cmd.edit(vim.v.oldfiles[1])
+  for _, file in ipairs(vim.v.oldfiles) do
+    local file_stat = vim.loop.fs_stat(file)
+    if file_stat and file_stat.type == "file" then
+      vim.cmd.edit(file)
+      return
+    end
+  end
 end)
 
 vim.o.shada = "!,'1000,<1000,s10,h"

@@ -36,10 +36,7 @@ return {
 
       vim.g.firenvim_config = {
         globalSettings = {
-          --['<C-w>'] = 'noop',
-          --['<C-j>'] = 'noop',
-          --['<C-k>'] = 'noop',
-          --['<C-n>'] = 'noop',
+          -- ['<C-s>'] = 'noop',
         },
         localSettings = {
           ["https://www.mail.google.com/*"] = {
