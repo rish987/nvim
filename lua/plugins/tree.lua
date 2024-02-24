@@ -27,6 +27,7 @@ return {
           end,
         })
       end
+      -- autoclose tree
       vim.api.nvim_create_autocmd("QuitPre", {
         callback = function()
           local tree_wins = {}
@@ -41,7 +42,7 @@ return {
               table.insert(floating_wins, w)
             end
           end
-          print( #wins , #floating_wins , #tree_wins )
+          -- print( #wins , #floating_wins , #tree_wins )
           if 1 == #wins - #floating_wins - #tree_wins then
             -- Should quit, so we close all invalid windows.
             for _, w in ipairs(tree_wins) do
@@ -56,7 +57,9 @@ return {
       -- })
       vim.api.nvim_create_autocmd({"DirChanged"},
       {
-        callback = function (info) require"nvim-tree.api".tree.change_root(info.file) end,
+        callback = function (info)
+            require"nvim-tree.api".tree.change_root(info.file)
+          end,
       })
     end
   }

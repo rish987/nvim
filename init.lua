@@ -100,6 +100,8 @@ require("alternate")
 
 require("jump-textobj")
 
+require("nvim-task")
+
 local locations_to_items = vim.lsp.util.locations_to_items
 vim.lsp.util.locations_to_items = function (locations, offset_encoding)
   local newLocations = {}

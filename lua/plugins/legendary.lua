@@ -15,7 +15,6 @@ return {
       {"<leader>E", "<Cmd>edit<cr>"},
       {"<leader>w", "<Cmd>w<CR>"},
       {"<leader>cl", "<Cmd>ccl<CR>"},
-      {"<leader>xx", "<Cmd>q<cr>"},
       {"<leader>p", "<Cmd>set paste<CR>"},
       {"<leader>P", "<Cmd>set nopaste<CR>"},
       {"<leader>m", "<Cmd>setlo nomodifiable<CR>"},
@@ -46,7 +45,7 @@ return {
       {"<C-h>", "<C-^>"},
       {"gh", "g<Tab>"},
       {"<leader>D", "<Cmd>Bdelete<CR>"},
-      {"<leader>n", "n"}, -- to get around better-n when necessary
+      {"<leader>n", "n"}, -- to get around better-n when necessary TODO FIXME does make better-n remember
       {"	", "<Cmd>bn<CR>"},
       {"<C-b>", "<Cmd>bp<CR>"},
     }

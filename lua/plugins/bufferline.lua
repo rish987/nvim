@@ -4,8 +4,8 @@ return {
     require("bufferline").setup(opts)
   end,
   init = function ()
-    vim.keymap.set('n', 'Q', "q")
-    vim.keymap.set('n', '<leader>q', "Q")
+    -- vim.keymap.set('n', 'Q', "q")
+    -- vim.keymap.set('n', '<leader>q', "Q")
     vim.keymap.set('n', 'q', require("bufferline").pick)
     vim.api.nvim_create_autocmd({"DirChanged"},
     {

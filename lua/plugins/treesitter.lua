@@ -78,9 +78,7 @@ return {
   },
   {
     "ziontee113/syntax-tree-surfer",
-    config = function ()
-      require"syntax-tree-surfer".setup()
-    end,
+    opts = {},
     init = function ()
       local opts = {noremap = true, silent = true}
 

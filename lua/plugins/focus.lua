@@ -1,8 +1,6 @@
 return {
   'nvim-focus/focus.nvim',
-  config = function ()
-    require("focus").setup()
-  end,
+  opts = {},
   init = function ()
     local ignore_filetypes = { 'NvimTree', 'help' }
     local ignore_buftypes = { 'nofile', 'prompt', 'popup', 'terminal' }
