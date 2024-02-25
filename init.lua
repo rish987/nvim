@@ -104,22 +104,20 @@ require("nvim-task")
 
 local locations_to_items = vim.lsp.util.locations_to_items
 vim.lsp.util.locations_to_items = function (locations, offset_encoding)
-  local newLocations = {}
   local lines = {}
   local loc_i = 1
   for _, loc in ipairs(vim.deepcopy(locations)) do
     local uri = loc.uri or loc.targetUri
     local range = loc.range or loc.targetSelectionRange
-    if not lines[uri .. range.start.line] then
-      table.insert(newLocations, loc)
+    if lines[uri .. range.start.line] then -- already have a location on this line
+      table.remove(locations, loc_i) -- remove from the original list
+    else
       loc_i = loc_i + 1
-    else -- already have a location on this line
-      table.remove(locations, loc_i) -- also remove from the original list
     end
     lines[uri .. range.start.line] = true
   end
 
-  return locations_to_items(newLocations, offset_encoding)
+  return locations_to_items(locations, offset_encoding)
 end
 
 local ran_local_cfg = {}
