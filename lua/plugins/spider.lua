@@ -3,19 +3,19 @@ return {
   init = function ()
     vim.keymap.set(
       { "n", "o", "x" },
-      "w",
+      "<C-S-w>",
       "<cmd>lua require('spider').motion('w')<CR>",
       { desc = "Spider-w" }
     )
     vim.keymap.set(
       { "n", "o", "x" },
-      "e",
+      "<C-S-e>",
       "<cmd>lua require('spider').motion('e')<CR>",
       { desc = "Spider-e" }
     )
     vim.keymap.set(
       { "n", "o", "x" },
-      "b",
+      "<C-S-b>",
       "<cmd>lua require('spider').motion('b')<CR>",
       { desc = "Spider-b" }
     )

@@ -1,6 +1,36 @@
 return {
   {
     "akinsho/toggleterm.nvim",
+    init = function ()
+      -- -- copied from https://github.com/akinsho/toggleterm.nvim/pull/368
+      -- local function neighbor_float_term(terminal_chooser)
+      --   if not require"toggleterm.ui".find_open_windows() then return end
+      --   local terms = require("toggleterm.terminal")
+      --
+      --   local terminals = terms.get_all()
+      --   local focused_term_index
+      --   for index, terminal in ipairs(terminals) do
+      --     if terminal:is_focused() then focused_term_index = index end
+      --   end
+      --
+      --   if not focused_term_index or not terminals[focused_term_index]:is_float() then return end
+      --
+      --   local focused_term = terminals[focused_term_index]
+      --
+      --   local next_terminal_index = terminal_chooser(focused_term_index, #terminals)
+      --
+      --   local next_terminal = terminals[next_terminal_index]
+      --
+      --   focused_term:close()
+      --   terms.get_or_create_term(next_terminal.id):open()
+      -- end
+      --
+      -- local function open_alt_float_term()
+      --   neighbor_float_term(function(focused_index, terminals_number) return focused_index == 1 and terminals_number or focused_index - 1 end)
+      -- end
+
+      -- vim.keymap.set("<C-d>", open_alt_float_term())
+    end,
     opts = {
       -- size can be a number or function which is passed the current terminal
       --size = 20 | function(term)
@@ -10,7 +40,7 @@ return {
       --    return vim.o.columns * 0.4
       --  end
       --end,
-      open_mapping = [[<c-s>]],
+      open_mapping = vim.g.StartedByNvimTask and [[<C-A-s>]] or [[<C-s>]],
       --on_open = fun(t: Terminal), -- function to run when the terminal opens
       --on_close = fun(t: Terminal), -- function to run when the terminal closes
       --on_stdout = fun(t: Terminal, job: number, data: string[], name: string) -- callback for processing output on stdout

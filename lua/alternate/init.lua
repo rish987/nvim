@@ -81,8 +81,8 @@ end
 
 vim.keymap.set("n", "<C-w><C-w>", M.alt_goto)
 
-vim.keymap.set("n", "<C-S-j>", M.alt_scroll(1))
-vim.keymap.set("n", "<C-S-k>", M.alt_scroll(-1))
-vim.keymap.set("n", "<C-S-w>c", M.alt_wincmd("c"))
+vim.keymap.set("n", "<C-A-j>", M.alt_scroll(1))
+vim.keymap.set("n", "<C-A-k>", M.alt_scroll(-1))
+vim.keymap.set("n", "<C-A-w>c", M.alt_wincmd("c"))
 
 return M

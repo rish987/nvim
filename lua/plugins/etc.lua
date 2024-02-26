@@ -29,5 +29,6 @@ return {
   },
   {
     "famiu/bufdelete.nvim"
-  }
+  },
+  { "tenxsoydev/karen-yank.nvim", config = true },
 }
