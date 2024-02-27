@@ -44,8 +44,16 @@ local function get_dir_prefix()
   return (vim.fn.getcwd()):sub(2):gsub("/", "_")
 end
 
-local curr_session = {}
+local data_file = vim.fn.stdpath("data") .. "/" .. "nvim-task.json"
+local curr_session = vim.fn.filereadable(data_file) ~= 0 and vim.fn.json_decode(vim.fn.readfile(data_file)) or {}
 -- TODO save/load from file
+
+local function set_curr_session(key, value)
+  curr_session[key] = value
+
+  local json = vim.fn.json_encode(curr_session)
+  vim.fn.writefile({json}, data_file)
+end
 
 local templates = {
   ["nvim"] = {
@@ -83,7 +91,7 @@ local abort_curr_task = function (cb)
       -- the old task may have saved a new session, if so update curr_session to use that one next time
       local reset_sess = nvt_conf.read_data().reset_sess
       if reset_sess then
-        curr_session[aborted_task_dir] = reset_sess
+        set_curr_session(aborted_task_dir, reset_sess)
       end
 
       nvt_conf.write_data("reset_sess", nil)
@@ -94,6 +102,12 @@ local abort_curr_task = function (cb)
   end
   return false
 end
+
+vim.api.nvim_create_autocmd("QuitPre", { -- makes sure that the last session state is saved before quitting
+  callback = function(_)
+    abort_curr_task()
+  end,
+})
 
 -- vim.keymap.set("n", "<leader><leader>", function()
 --   vim.cmd.rshada({bang = true})
@@ -110,7 +124,7 @@ end
 local function _new_nvim_task(sess)
   if not sess then sess = curr_session[get_dir_prefix()] or nvt_conf.temp_sessname end
 
-  curr_session[get_dir_prefix()] = sess -- probably not necessary
+  set_curr_session(get_dir_prefix(), sess) -- probably not necessary
   print("loading task session:", sess)
 
   overseer.run_template({name = "nvim", params = {sess = sess, dir = get_dir_prefix()}}, task_cb)

@@ -46,7 +46,7 @@ return {
       {"<C-h>", "<C-^>"},
       {"gh", "g<Tab>"},
       {"<leader>D", "<Cmd>Bdelete<CR>"},
-      {"<leader>n", "n"}, -- to get around better-n when necessary TODO FIXME does make better-n remember
+      {"<leader>n", "/<C-p><CR>"}, -- to get around better-n when necessary
       {"<C-Tab>", "<Cmd>bn<CR>"},
       {"<C-b>", "<Cmd>bp<CR>"},
     }

@@ -17,7 +17,7 @@ M.session_exists = function(sessname, sessdir)
   return file_exists(sess_filename)
 end
 
-local data_file = vim.fn.stdpath("data") .. "/" .. "nvim-task.json"
+local data_file = vim.fn.stdpath("data") .. "/" .. "nvim-task-state.json"
 
 function M.read_data()
   if vim.fn.filereadable(data_file) ~= 0 then
@@ -48,6 +48,8 @@ function M.write_data(key, value)
 end
 
 if not vim.g.StartedByNvimTask then return M end
+
+vim.o.swapfile = false
 
 local resession = require"resession"
 
