@@ -39,9 +39,16 @@ function M.read_data()
   end
 end
 
-function M.write_data(key, value)
+function M.erase_data(key)
   local data = M.read_data()
-  data[key] = value
+  data[key] = nil
+
+  local json = vim.fn.json_encode(data)
+  vim.fn.writefile({json}, data_file)
+end
+
+function M.write_data(new_data)
+  local data = vim.tbl_extend("keep", new_data, M.read_data())
 
   local json = vim.fn.json_encode(data)
   vim.fn.writefile({json}, data_file)
@@ -57,7 +64,6 @@ local sessiondir = M.get_sessiondir(vim.g.NvimTaskDir)
 
 vim.keymap.set("n", "<leader>S", function () -- save to default slot
   resession.save(M.saved_sessname, { dir = sessiondir })
-  print("current session:", resession.get_current())
 end)
 
 vim.keymap.set("n", "<leader>F", function () -- save a new session
@@ -85,12 +91,36 @@ vim.api.nvim_create_autocmd("VimEnter", {
   end,
 })
 
+local recorded_register
+
+vim.api.nvim_create_autocmd("RecordingLeave", {
+  callback = function()
+    recorded_register = vim.fn.reg_recording()
+  end,
+})
+
+vim.keymap.set("n", "<leader>X", function ()
+  local sess = get_session_name()
+  M.write_data({reset_sess = sess})
+end)
+
+local log = require"vim.lsp.log"
+
 vim.api.nvim_create_autocmd("VimLeavePre", {
   callback = function()
-    local sess = get_session_name()
     local abort_temp_save = M.read_data().abort_temp_save
 
-    M.write_data("reset_sess", sess)
+    local sess = get_session_name()
+    M.write_data({reset_sess = sess})
+
+    if recorded_register then
+      resession.modify_data(nil, {dir = sessiondir},
+        function (data)
+          data["nvim-task"] = {registers = {[recorded_register] = vim.fn.getreg(recorded_register)}}
+          return data
+        end
+      )
+    end
 
     if sess == M.temp_sessname and not abort_temp_save then -- only auto-save temporary session
       resession.save(sess, { dir = sessiondir, notify = false })

@@ -19,8 +19,8 @@ return {
       "<cmd>lua require('spider').motion('b')<CR>",
       { desc = "Spider-b" }
     )
-    vim.keymap.set("i", "<C-f>", "<Esc>l<cmd>lua require('spider').motion('w')<CR>i")
-    vim.keymap.set("i", "<C-b>", "<Esc><cmd>lua require('spider').motion('b')<CR>i")
+    -- vim.keymap.set("i", "<C-f>", "<Esc>l<cmd>lua require('spider').motion('w')<CR>i")
+    -- vim.keymap.set("i", "<C-b>", "<Esc><cmd>lua require('spider').motion('b')<CR>i")
     vim.keymap.set("n", "cw", "cw", { remap = false })
     vim.keymap.set("n", "dw", "dw", { remap = false })
   end,

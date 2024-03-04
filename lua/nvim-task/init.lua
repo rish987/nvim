@@ -94,7 +94,7 @@ local abort_curr_task = function (cb)
         set_curr_session(aborted_task_dir, reset_sess)
       end
 
-      nvt_conf.write_data("reset_sess", nil)
+      nvt_conf.erase_data("reset_sess")
 
       if cb then cb() end
     end)
@@ -118,7 +118,7 @@ local function task_cb (task)
   curr_task = task
   curr_task_dir = get_dir_prefix()
 
-  nvt_conf.write_data("abort_temp_save", nil)
+  nvt_conf.erase_data("abort_temp_save")
 end
 
 local function _new_nvim_task(sess)
@@ -190,7 +190,7 @@ local function save_restart()
 end
 
 local function blank_sess()
-  nvt_conf.write_data("abort_temp_save", "true")
+  nvt_conf.write_data({abort_temp_save = true})
 
   if nvt_conf.session_exists(nvt_conf.temp_sessname, nvt_conf.get_sessiondir(get_dir_prefix())) then
     resession.delete(nvt_conf.temp_sessname, { dir = nvt_conf.get_sessiondir(get_dir_prefix()) })

@@ -15,6 +15,11 @@ return {
         interval = 60,
         notify = false,
       },
+      extensions = {
+        ["nvim-task"] = {
+          -- these args will get passed in to M.config()
+        },
+      },
     },
     init = function ()
       require"resession".add_hook("post_load", function ()
