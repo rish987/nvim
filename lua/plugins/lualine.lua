@@ -39,12 +39,6 @@ return {
             },
           },
         },
-        lualine_y = {
-          { require("recorder").displaySlots },
-        },
-        lualine_z = {
-          { require("recorder").recordingStatus },
-        },
       }
     end,
   }

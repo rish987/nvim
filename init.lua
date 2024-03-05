@@ -64,6 +64,7 @@ require("lazy").setup("plugins",
         -- "jonatan-branting/nvim-better-n",
         "stevearc/overseer.nvim",
         "akinsho/bufferline.nvim",
+        "chrisgrieser/nvim-recorder",
       }, -- For example {"folke"}
       fallback = false, -- Fallback to git when local plugin doesn't exist
     },

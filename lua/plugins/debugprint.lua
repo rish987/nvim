@@ -42,5 +42,8 @@ return {
     vim.keymap.set("n", "<Leader>dD", function(opts)
       return require('debugprint').deleteprints(opts)
     end)
+    vim.keymap.set("v", "<Leader>d", function()
+      vim.fn.feedkeys(require('debugprint').debugprint({variable = true}))
+    end)
   end
 }

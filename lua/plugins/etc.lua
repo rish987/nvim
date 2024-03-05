@@ -33,6 +33,7 @@ return {
   { "tenxsoydev/karen-yank.nvim", config = function ()
     require"karen-yank".setup({
       mappings = {
+        karen = "y",
         invert = true
       }
     })

@@ -1,5 +1,6 @@
 return {
 	"chrisgrieser/nvim-recorder",
+  -- enabled = false,
 	dependencies = "rcarriga/nvim-notify", -- optional
 	opts = {
     slots = { "a", "b" },
@@ -19,5 +20,17 @@ return {
     vim.keymap.set("i", "<C-e>", function ()
       -- no-op
     end)
+
+    local lualineZ = require("lualine").get_config().sections.lualine_z or {}
+    local lualineY = require("lualine").get_config().sections.lualine_y or {}
+    table.insert(lualineZ, { require("recorder").recordingStatus })
+    table.insert(lualineY, { require("recorder").displaySlots })
+
+    require("lualine").setup {
+      tabline = {
+        lualine_y = lualineY,
+        lualine_z = lualineZ,
+      },
+    }
   end,
 }
