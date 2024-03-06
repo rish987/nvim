@@ -106,6 +106,19 @@ end)
 
 local log = require"vim.lsp.log"
 
+local function modify_data(name, opts, modify_fn)
+  if not name then
+    -- If no name, default to the current session
+    name = require"resession".get_current()
+  end
+  opts = opts or {}
+  local files = require"resession.files"
+  local util = require"resession.util"
+  local filename = util.get_session_file(name, opts.dir)
+  local data = modify_fn(files.load_json_file(filename))
+  files.write_json_file(filename, data)
+end
+
 vim.api.nvim_create_autocmd("VimLeavePre", {
   callback = function()
     local abort_temp_save = M.read_data().abort_temp_save
@@ -114,7 +127,7 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
     M.write_data({reset_sess = sess})
 
     if recorded_register then
-      resession.modify_data(nil, {dir = sessiondir},
+      modify_data(nil, {dir = sessiondir},
         function (data)
           data["nvim-task"] = {registers = {[recorded_register] = vim.fn.getreg(recorded_register)}}
           return data
