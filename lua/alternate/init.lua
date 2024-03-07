@@ -10,8 +10,12 @@ vim.api.nvim_create_autocmd("WinLeave", {
   end,
 })
 
+function M.curr_altwin()
+  return altwin
+end
+
 -- TODO remember altwins on a per-tabpage basis
-function M.get_altwin()
+function M.refresh_altwin()
   if altwin and vim.api.nvim_win_is_valid(altwin) and vim.api.nvim_win_get_tabpage(altwin) == vim.api.nvim_get_current_tabpage() then return altwin end
 
   -- choose any other valid window as the alternate
@@ -27,7 +31,7 @@ end
 
 function M.alt_cmd(cmd)
   return function ()
-    M.get_altwin()
+    M.refresh_altwin()
     if not altwin then return end
 
     vim.api.nvim_win_call(altwin, function()
@@ -38,7 +42,7 @@ end
 
 function M.alt_feedkeys(keys)
   return function ()
-    M.get_altwin()
+    M.refresh_altwin()
     if not altwin then return end
 
     vim.api.nvim_win_call(altwin, function()
@@ -49,7 +53,7 @@ end
 
 function M.alt_wincmd(cmd)
   return function ()
-    M.get_altwin()
+    M.refresh_altwin()
     if not altwin then return end
 
     vim.api.nvim_win_call(altwin, function()
@@ -59,7 +63,7 @@ function M.alt_wincmd(cmd)
 end
 
 function M.alt_goto()
-  M.get_altwin()
+  M.refresh_altwin()
   if not altwin then return end
 
   vim.api.nvim_set_current_win(altwin)
@@ -67,7 +71,7 @@ end
 
 function M.alt_scroll(direction, speed)
   return function ()
-    M.get_altwin()
+    M.refresh_altwin()
     if not altwin then return end
 
     speed = speed or vim.api.nvim_win_get_height(altwin) / 2

@@ -2,9 +2,7 @@ return {
   {
     'nvim-lualine/lualine.nvim',
     lazy = false,
-    config = function (_, opts)
-      require"lualine".setup(opts) -- FIXME should't this be done automatically?
-    end,
+    config = true,
     dependencies = {
       "folke/noice.nvim"
     },
@@ -39,6 +37,19 @@ return {
             },
           },
         },
+        inactive_sections = {
+          lualine_x = {
+            {
+              function () -- FIXME trigger more frequent alternate resets
+                return "ALT"
+              end,
+              cond = function ()
+                return require"alternate".curr_altwin() == vim.api.nvim_get_current_win()
+              end,
+              color = { fg = "#000000", bg = "#fc51ed" },
+            },
+          }
+        }
       }
     end,
   }

@@ -8,19 +8,17 @@ return {
     mapping = {
       startStopRecording = "<leader>q",
       playMacro = "<C-n>",
+      insertPlayMacro = "<C-n>",
       switchSlot = "<leader>Q",
       editMacro = "cq",
       deleteAllMacros = "dq",
       yankMacro = "yq",
       -- ⚠️ this should be a string you don't use in insert mode during a macro
       addBreakPoint = "<C-e>",
+      insertAddBreakPoint = "<C-e>",
     },
   }, -- required even with default settings, since it calls `setup()`
   init = function ()
-    vim.keymap.set("i", "<C-e>", function ()
-      -- no-op
-    end)
-
     -- local lualineZ = require("lualine").get_config().sections.lualine_z or {}
     -- local lualineY = require("lualine").get_config().sections.lualine_y or {}
     -- table.insert(lualineZ, { require("recorder").recordingStatus })
