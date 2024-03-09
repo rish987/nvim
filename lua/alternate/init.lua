@@ -1,33 +1,59 @@
 local M = {}
 
 local excluded_filetypes = { "NvimTree" }
+local prevwin
 local altwin
+
 vim.api.nvim_create_autocmd("WinLeave", {
   callback = function()
-    if not vim.tbl_contains(excluded_filetypes, vim.o.ft) then
-      altwin = vim.api.nvim_get_current_win()
-    end
+    prevwin = vim.api.nvim_get_current_win()
   end,
+})
+
+vim.api.nvim_create_autocmd({"WinLeave", "WinEnter", "WinNew", "BufWinEnter", "VimEnter"}, {
+  callback = function()
+    M.refresh_altwin()
+  end
 })
 
 function M.curr_altwin()
   return altwin
 end
 
+function M.set_altwin(new_altwin)
+  altwin = new_altwin
+  require"lualine".refresh()
+end
+
+local function is_valid_altwin(win)
+  if not win or not vim.api.nvim_win_is_valid(win) then return false end
+  local excluded = vim.tbl_contains(excluded_filetypes, vim.bo[vim.api.nvim_win_get_buf(win)].ft)
+  local in_curr_tab = vim.api.nvim_win_get_tabpage(win) == vim.api.nvim_get_current_tabpage()
+  local is_curr_win = vim.api.nvim_get_current_win() == win
+  return in_curr_tab and not excluded and not is_curr_win
+end
+
 -- TODO remember altwins on a per-tabpage basis
 function M.refresh_altwin()
-  if altwin and vim.api.nvim_win_is_valid(altwin) and vim.api.nvim_win_get_tabpage(altwin) == vim.api.nvim_get_current_tabpage() then return altwin end
+  local _prevwin = prevwin
+  prevwin = nil
+
+  if is_valid_altwin(altwin) then return altwin end
+  if is_valid_altwin(_prevwin) then M.set_altwin(_prevwin) end
+
+  altwin = nil
 
   -- choose any other valid window as the alternate
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
     local floating = vim.api.nvim_win_get_config(win).relative ~= ''
-    local excluded = vim.tbl_contains(excluded_filetypes, vim.bo[vim.api.nvim_win_get_buf(win)].ft)
-    if win ~= vim.api.nvim_get_current_win() and not excluded and not floating then
-      altwin = win
+    if is_valid_altwin(win) and not floating then
+      M.set_altwin(win)
       return altwin
     end
   end
 end
+
+vim.keymap.set("n", "<space>j", M.refresh_altwin)
 
 function M.alt_cmd(cmd)
   return function ()

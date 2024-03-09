@@ -50,6 +50,8 @@ vim.opt.rtp:prepend(lazypath)
 
 require("rooter")
 
+require("alternate")
+
 require("lazy").setup("plugins",
   {
     dev = {
@@ -96,8 +98,6 @@ vim.api.nvim_create_autocmd("WinClosed", {
 
 --require"vim.lsp.log".set_level("debug")
 require("multifun")
-
-require("alternate")
 
 require("jump-textobj")
 
