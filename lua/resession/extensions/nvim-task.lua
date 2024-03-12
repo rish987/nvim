@@ -22,6 +22,11 @@ M.on_post_load = function(data)
         vim.fn.setreg(reg, value)
       end
     end
+    if data.map then
+      for mode, str in pairs(data.map) do
+        require"nvim-task.config".set_keymap(mode, "<c-x>", str)
+      end
+    end
   end
   -- This is run after the buffers, windows, and tabs are restored
 end

@@ -9,7 +9,7 @@ return {
       startStopRecording = "<leader>q",
       playMacro = "<C-n>",
       insertPlayMacro = "<C-n>",
-      switchSlot = "<leader>Q",
+      switchSlot = "<leader><c-q>",
       editMacro = "cq",
       deleteAllMacros = "dq",
       yankMacro = "yq",

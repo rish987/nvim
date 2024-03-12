@@ -33,17 +33,14 @@ return {
             {
               get_bufnrs = function()
                 local bufs = {}
+                table.insert(bufs, vim.api.nvim_get_current_buf())
                 local out = vim.fn.system("git rev-parse --show-toplevel")
-                if vim.v.shell_error ~= 0 then -- use only current buffer if not in git repo
-                  table.insert(bufs, vim.api.nvim_get_current_buf())
-                else
-                  local rootdir = string.sub(out, 1, -2)
-                  for _, buf in pairs(vim.api.nvim_list_bufs()) do
-
-                    local filename = vim.api.nvim_buf_get_name(buf)
-                    if filename:find(rootdir, 1, true) == 1 then
-                      table.insert(bufs, buf)
-                    end
+                if vim.v.shell_error ~= 0 then return bufs end
+                local rootdir = string.sub(out, 1, -2)
+                for _, buf in pairs(vim.api.nvim_list_bufs()) do
+                  local filename = vim.api.nvim_buf_get_name(buf)
+                  if filename:find(rootdir, 1, true) == 1 then
+                    table.insert(bufs, buf)
                   end
                 end
                 return bufs

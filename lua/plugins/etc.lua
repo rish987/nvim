@@ -39,4 +39,11 @@ return {
     })
     vim.api.nvim_create_augroup("KarenYank", {clear = true})
   end },
+  {
+    "ton/vim-bufsurf",
+    init = function ()
+      vim.keymap.set("n", "<C-S-h>", "<Plug>(buf-surf-back)")
+      vim.keymap.set("n", "<C-S-l>", "<Plug>(buf-surf-forward)")
+    end
+  },
 }

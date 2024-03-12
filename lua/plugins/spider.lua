@@ -15,7 +15,7 @@ return {
     )
     vim.keymap.set(
       { "n", "o", "x" },
-      "<C-S-b>",
+      "<C-S-m>",
       "<cmd>lua require('spider').motion('b')<CR>",
       { desc = "Spider-b" }
     )
