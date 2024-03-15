@@ -46,4 +46,7 @@ return {
       vim.keymap.set("n", "<C-S-l>", "<Plug>(buf-surf-forward)")
     end
   },
+  -- {
+  --   "direnv/direnv.vim",
+  -- },
 }
