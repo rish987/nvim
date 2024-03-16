@@ -19,11 +19,13 @@ return {
       },
     },
     init = function ()
-      if not vim.g.started_by_firenvim == true then
+      if not vim.g.started_by_firenvim == true and not vim.g.StartedByNvimTask then
         vim.api.nvim_create_autocmd({"TabNew", "VimEnter"},
         {
           callback = function ()
-            require"nvim-tree.api".tree.toggle({focus = false})
+            if not require"nvim-tree.view".is_visible() then
+              require"nvim-tree.api".tree.toggle({focus = false})
+            end
           end,
         })
       end

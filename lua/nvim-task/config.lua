@@ -60,6 +60,40 @@ vim.o.swapfile = false
 
 local resession = require"resession"
 
+local msgview_buf, msgview_win
+
+function M.open_messageview()
+  if msgview_buf then return end
+
+  local orig_win = vim.api.nvim_get_current_win()
+  msgview_buf = vim.api.nvim_create_buf(false, true)
+  vim.bo[msgview_buf].ft = "NvimTaskMsgView"
+  -- FIXME use vim.api.nvim_open_win instead (recent feature)
+  vim.cmd("rightbelow vsplit")
+  vim.api.nvim_win_set_buf(0, msgview_buf)
+  msgview_win = vim.api.nvim_get_current_win()
+  vim.cmd("set winfixwidth")
+  vim.cmd("set winfixwidth")
+  vim.cmd("vertical resize 80")
+  vim.api.nvim_set_current_win(orig_win)
+end
+
+vim.notify = function(msg, level, opts)
+  if not msgview_buf then M.open_messageview() end
+
+  local msg_text = vim.api.nvim_buf_get_text(msgview_buf, 0, 0, -1, -1, {})
+  local num_lines = #msg_text
+  local last_line_length = #msg_text[num_lines]
+
+  local new_text = last_line_length == 0 and {msg} or {"", msg}
+  vim.api.nvim_buf_set_text(msgview_buf, num_lines - 1, last_line_length, num_lines - 1, last_line_length, new_text)
+end
+
+vim.keymap.set("n", "<leader>x", function ()
+  vim.notify("HERE")
+  -- vim.api.nvim_buf_set_text(50, num_lines - 1, last_line_length, num_lines - 1, last_line_length, new_text)
+end)
+
 local sessiondir = M.get_sessiondir(vim.g.NvimTaskDir)
 
 vim.keymap.set("n", "<leader>S", function () -- save to default slot

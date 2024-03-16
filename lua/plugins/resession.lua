@@ -6,6 +6,7 @@ return {
         -- filter out infoview windows that start with "lean:"
         if vim.startswith(vim.api.nvim_buf_get_name(bufnr), "lean:") then return false end
         if vim.bo[bufnr].ft == "NvimTree" then return false end
+        if vim.bo[bufnr].ft == "NvimTaskMsgView" then return false end
         return true
       end,
       -- good periodically save your sessions for the time being since this plugin tends to freeze
@@ -22,11 +23,16 @@ return {
       },
     },
     init = function ()
-      require"resession".add_hook("post_load", function ()
-        if not require"nvim-tree.view".is_visible() then
-          require"nvim-tree.api".tree.toggle({focus = false})
-        end
-      end)
+      if not vim.g.StartedByNvimTask  then
+        require"resession".add_hook("post_load", function ()
+          if not require"nvim-tree.view".is_visible()then
+            require"nvim-tree.api".tree.toggle({focus = false})
+          end
+        end)
+      else
+        -- require"nvim-task".open_messageview()
+      end
+
       vim.keymap.set('n', '<leader>sss', require"resession".save)
       vim.keymap.set('n', '<leader>ssl', require"resession".load)
       vim.keymap.set('n', '<leader>ssd', require"resession".delete)

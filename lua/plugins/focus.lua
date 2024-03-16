@@ -1,5 +1,6 @@
 return {
   'nvim-focus/focus.nvim',
+  enabled = not vim.g.StartedByNvimTask,
   opts = {},
   init = function ()
     local ignore_filetypes = { 'NvimTree', 'help' }
