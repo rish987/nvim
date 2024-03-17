@@ -78,21 +78,47 @@ function M.open_messageview()
   vim.api.nvim_set_current_win(orig_win)
 end
 
-vim.notify = function(msg, level, opts)
-  if not msgview_buf then M.open_messageview() end
+M.ns = vim.api.nvim_create_namespace("nvim-task")
+local ui_opts = {
+  ext_messages = true,
+  ext_cmdline = true,
+  ext_popupmenu = true
+}
 
-  local msg_text = vim.api.nvim_buf_get_text(msgview_buf, 0, 0, -1, -1, {})
-  local num_lines = #msg_text
-  local last_line_length = #msg_text[num_lines]
+local msgview_enabled = false
 
-  local new_text = last_line_length == 0 and {msg} or {"", msg}
-  vim.api.nvim_buf_set_text(msgview_buf, num_lines - 1, last_line_length, num_lines - 1, last_line_length, new_text)
+function M.msgview_enable()
+  if msgview_enabled then return end
+  vim.ui_attach(M.ns, ui_opts, function(event, kind, msg_data, _)
+    if not msgview_buf then M.open_messageview() end
+
+    local msgs_text = vim.api.nvim_buf_get_text(msgview_buf, 0, 0, -1, -1, {})
+    local num_lines = #msgs_text
+    local last_line_length = #msgs_text[num_lines]
+
+    local cursorpos = vim.api.nvim_win_get_cursor(msgview_win)
+    local at_bottom = cursorpos[1] == num_lines
+
+    local msg_text = msg_data[1][2]
+    msg_text = vim.fn.join(vim.tbl_map(function(value) return "  " .. value end, vim.split(msg_text, "\n")), "\n")
+    local msg = vim.split(("(%s, %s):\n%s"):format(event, kind or "[nil]", msg_text), "\n")
+
+    local new_text = last_line_length == 0 and msg or {"", unpack(msg)}
+    vim.api.nvim_buf_set_text(msgview_buf, num_lines - 1, last_line_length, num_lines - 1, last_line_length, new_text)
+
+    -- autoscroll
+    if at_bottom then
+      vim.fn.win_execute(msgview_win, "normal! G")
+    end
+  end)
+  msgview_enabled = true
 end
 
-vim.keymap.set("n", "<leader>x", function ()
-  vim.notify("HERE")
-  -- vim.api.nvim_buf_set_text(50, num_lines - 1, last_line_length, num_lines - 1, last_line_length, new_text)
-end)
+-- vim.keymap.set("n", "<leader>x", function ()
+--   M.msgview_enable()
+--   print("HERE")
+--   -- vim.api.nvim_buf_set_text(50, num_lines - 1, last_line_length, num_lines - 1, last_line_length, new_text)
+-- end)
 
 local sessiondir = M.get_sessiondir(vim.g.NvimTaskDir)
 

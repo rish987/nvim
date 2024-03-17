@@ -11,7 +11,13 @@ return {
         ["cmp.entry.get_documentation"] = true, -- requires hrsh7th/nvim-cmp
       },
     },
+    messages = {
+      enabled = true
+    },
     cmdline = {
+      enabled = true
+    },
+    notify = {
       enabled = true
     },
     -- you can enable a preset for easier configuration
