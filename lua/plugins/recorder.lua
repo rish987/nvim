@@ -6,16 +6,16 @@ return {
     slots = { "a", "b" },
 
     mapping = {
-      startStopRecording = "<leader>q",
-      playMacro = "<C-n>",
-      insertPlayMacro = "<C-n>",
-      switchSlot = "<leader><c-q>",
-      editMacro = "cq",
-      deleteAllMacros = "dq",
-      yankMacro = "yq",
-      -- ⚠️ this should be a string you don't use in insert mode during a macro
-      addBreakPoint = "<C-e>",
-      insertAddBreakPoint = "<C-e>",
+      startStopRecording       = vim.g.StartedByNvimTask and "<C-A-f>" or "<C-f>",
+      insertStartStopRecording = vim.g.StartedByNvimTask and "<C-A-f>" or "<C-f>",
+      playMacro                = vim.g.StartedByNvimTask and "<C-A-n>" or "<C-n>",
+      insertPlayMacro          = vim.g.StartedByNvimTask and "<C-A-n>" or "<C-n>",
+      switchSlot               = "<leader><c-q>",
+      editMacro                = "cq",
+      deleteAllMacros          = "dq",
+      yankMacro                = "yq",
+      addBreakPoint            = vim.g.StartedByNvimTask and "<C-A-e>" or "<C-e>", -- ⚠️ this should be a string you don't use in insert mode during a macro
+      insertAddBreakPoint      = vim.g.StartedByNvimTask and "<C-A-e>" or "<C-e>", -- ⚠️ this should be a string you don't use in insert mode during a macro
     },
   }, -- required even with default settings, since it calls `setup()`
   init = function ()

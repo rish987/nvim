@@ -10,14 +10,21 @@ return {
 
       local lspconfig = require "lspconfig"
 
-      local library = vim.api.nvim_get_runtime_file("", true)
-      vim.list_extend(library, {"~/.local/share/nvim/lazy/plenary.nvim/lua"})
+      local library = {[vim.fn.expand('$VIMRUNTIME/lua')] = true, [vim.fn.expand('$VIMRUNTIME/lua/vim/lsp')] = true}
+      -- local library = vim.api.nvim_get_runtime_file("", true)
+      -- vim.list_extend(library, {"~/.local/share/nvim/lazy/plenary.nvim/lua"})
 
       local settings_override = {
         ["lua_ls"] = {
           Lua = {
             completion = {
               callSnippet = 'Replace',
+            },
+            runtime = {
+              -- Tell the language server which version of Lua you're using (most likely LuaJIT in the case of Neovim)
+              version = 'LuaJIT',
+              -- Setup your lua path
+              path = vim.split(package.path, ';')
             },
             diagnostics = {
               disable = {"duplicate-set-field", "duplicate-doc-field", "missing-fields", "need-check-nil"},
