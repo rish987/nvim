@@ -74,8 +74,8 @@ return {
         --width = <value>,
         --height = <value>,
         winblend = 0,
-        col = 85,
-        width = function ()
+        col = not vim.g.StartedByNvimTask and 85,
+        width = not vim.g.StartedByNvimTask and function ()
           return vim.o.columns - 20 - 80
         end,
         highlights = {

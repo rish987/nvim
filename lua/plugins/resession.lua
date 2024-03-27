@@ -5,8 +5,9 @@ return {
       buf_filter = function(bufnr)
         -- filter out infoview windows that start with "lean:"
         if vim.startswith(vim.api.nvim_buf_get_name(bufnr), "lean:") then return false end
-        if vim.bo[bufnr].ft == "NvimTree" then return false end
-        if vim.bo[bufnr].ft == "NvimTaskMsgView" then return false end
+        for _, ft in ipairs(require"config_util".exclude_filetypes) do
+          if vim.bo[bufnr].ft == ft then return false end
+        end
         return true
       end,
       -- good periodically save your sessions for the time being since this plugin tends to freeze

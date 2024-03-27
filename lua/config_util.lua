@@ -24,4 +24,6 @@ function M.tmap(shortcut, command)
   M.map('t', shortcut, command)
 end
 
+M.exclude_filetypes = {"help", "NvimTree", "Codewindow", "NvimTaskMsgView"}
+
 return M

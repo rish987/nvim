@@ -3,7 +3,7 @@ return {
   enabled = not vim.g.StartedByNvimTask,
   opts = {},
   init = function ()
-    local ignore_filetypes = { 'NvimTree', 'help' }
+    local ignore_filetypes = require"config_util".exclude_filetypes
     local ignore_buftypes = { 'nofile', 'prompt', 'popup', 'terminal' }
 
     local augroup =

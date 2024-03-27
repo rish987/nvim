@@ -1,7 +1,7 @@
 -- Array of file names indicating root directory. Modify to your liking.
 local root_names = { '.git' }
 local excluded_root_names = { '.lake' }
-local ignore_filetypes = { 'NvimTree', 'help' }
+local ignore_filetypes = require"config_util".exclude_filetypes
 local ignore_buftypes = { 'nofile', 'prompt', 'popup', 'terminal' }
 
 -- Cache to use for speed up (at cost of possibly outdated results)

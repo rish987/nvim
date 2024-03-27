@@ -58,6 +58,11 @@ return {
       vim.keymap.set("n", "<leader>fu", function() require'telescope'.extensions.undo.undo{
         side_by_side = true,
         diff_context_lines = 5,
+        mappings = {
+          normal = {
+            ["<cr>"] = require("telescope-undo.actions").restore,
+          }
+        }
       } end)
 
       vim.keymap.set("n", "<leader>fm", "<Cmd>Noice telescope<CR>")
