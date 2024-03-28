@@ -26,4 +26,8 @@ end
 
 M.exclude_filetypes = {"help", "NvimTree", "Codewindow", "NvimTaskMsgView"}
 
+M.lazypluginpath = vim.fn.stdpath("data") .. "/lazy"
+M.lazypath = M.lazypluginpath .. "/lazy.nvim"
+M.devpluginpath = vim.loop.os_homedir() .. "/plugins"
+
 return M

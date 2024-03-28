@@ -1,3 +1,4 @@
+local util = require"config_util"
 local function get_telescope_targets(prompt_bufnr)
   local pick = require"telescope.actions.state".get_current_picker(prompt_bufnr)
   local scroller = require "telescope.pickers.scroller"
@@ -27,6 +28,7 @@ return {
       vim.keymap.set("n", "<leader>f?", function() require("telescope.builtin").planets({show_pluto = true, show_moon = true}) end)
       vim.keymap.set("n", "<leader>ff", function() require("telescope.builtin").find_files() end)
       vim.keymap.set("n", "<leader>fg", function() require("telescope").extensions.egrepify.egrepify {} end)
+      vim.keymap.set("n", "<leader>fG", function() require("telescope").extensions.egrepify.egrepify {search_dirs = {util.lazypluginpath, util.devpluginpath}} end)
       vim.keymap.set("n", "<leader>fb", function() require("telescope.builtin").buffers() end)
       vim.keymap.set("n", "<leader>fh", function() require("telescope.builtin").help_tags({
         -- attach_mappings = function(_)
@@ -52,7 +54,7 @@ return {
       vim.keymap.set("n", "<leader>fl", function() require'telescope'.extensions.repo.list
         {
           search_dirs = {
-            "~/.local/share/nvim/lazy/",
+            util.lazypluginpath,
           },
         } end)
       vim.keymap.set("n", "<leader>fu", function() require'telescope'.extensions.undo.undo{
