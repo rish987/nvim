@@ -7,6 +7,14 @@ return {
       local args = { '--stdio', '--', '-M', '16384', '-T', '100000' }
       local cmd = { bin_name, unpack(args) }
       return {
+        progress_bars = {
+          -- Enable the progress bars?
+          enable = false,
+          -- What character should be used for the bars?
+          character = '│',
+          -- Use a different priority for the signs
+          priority = 10,
+        },
         -- Abbreviation support
         abbreviations = {
             -- Set one of the following to true to enable abbreviations

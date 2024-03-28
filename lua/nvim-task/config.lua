@@ -90,7 +90,8 @@ local msgview_enabled = false
 function M.msgview_enable()
   if msgview_enabled then return end
   vim.ui_attach(M.ns, ui_opts, function(event, kind, msg_data, _)
-    if not msgview_buf then M.open_messageview() end
+    if event ~= "msg_show" then return end
+    if not msgview_win then M.open_messageview() end
 
     local msgs_text = vim.api.nvim_buf_get_text(msgview_buf, 0, 0, -1, -1, {})
     local num_lines = #msgs_text
@@ -114,10 +115,23 @@ function M.msgview_enable()
   msgview_enabled = true
 end
 
+if vim.v.vim_did_enter == 0 then
+  -- Schedule loading after VimEnter. Get the UI up and running first.
+  vim.api.nvim_create_autocmd("VimEnter", {
+    once = true,
+    callback = M.msgview_enable
+,
+  })
+else
+  -- Schedule on the event loop
+  vim.schedule(M.msgview_enable)
+end
+
 -- vim.keymap.set("n", "<leader>x", function ()
---   M.msgview_enable()
 --   print("HERE")
---   -- vim.api.nvim_buf_set_text(50, num_lines - 1, last_line_length, num_lines - 1, last_line_length, new_text)
+-- end)
+-- vim.keymap.set("n", "<leader>X", function ()
+--   prin("HERE")
 -- end)
 
 local sessiondir = M.get_sessiondir(vim.g.NvimTaskDir)
