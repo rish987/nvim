@@ -1,8 +1,7 @@
 return {
   'gorbit99/codewindow.nvim',
-  config = true,
   opts = {
-    auto_enable = true,
+    auto_enable = false,
     exclude_filetypes = require"config_util".exclude_filetypes, -- Choose certain filetypes to not show minimap on
   },
   init = function()

@@ -4,7 +4,7 @@ return {
 	dependencies = "rcarriga/nvim-notify", -- optional
 	opts = {
     slots = { "a", "b" },
-
+    term_slots = { "x" },
     mapping = {
       startStopRecording       = vim.g.StartedByNvimTask and "<C-A-f>" or "<C-f>",
       insertStartStopRecording = vim.g.StartedByNvimTask and "<C-A-f>" or "<C-f>",
