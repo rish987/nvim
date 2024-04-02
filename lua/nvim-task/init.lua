@@ -8,6 +8,7 @@ local pickers = require "telescope.pickers"
 -- local utils = require "telescope.utils"
 local conf = require("telescope.config").values
 local resession = require"resession"
+local recorder = require"recorder"
 
 local nvt_conf = require "nvim-task.config"
 
@@ -48,11 +49,17 @@ local data_file = vim.fn.stdpath("data") .. "/" .. "nvim-task.json"
 local curr_session = vim.fn.filereadable(data_file) ~= 0 and vim.fn.json_decode(vim.fn.readfile(data_file)) or {}
 -- TODO save/load from file
 
-local function set_curr_session(key, value)
-  curr_session[key] = value
+local function _set_curr_session(key, value)
+  local curr_data = curr_session[key] or {}
+  curr_data = vim.tbl_extend("keep", value, curr_data)
+  curr_session[key] = curr_data
 
   local json = vim.fn.json_encode(curr_session)
   vim.fn.writefile({json}, data_file)
+end
+
+local function set_curr_session(value)
+  _set_curr_session(get_dir_prefix(), value)
 end
 
 local templates = {
@@ -91,7 +98,7 @@ local abort_curr_task = function (cb)
       -- the old task may have saved a new session, if so update curr_session to use that one next time
       local reset_sess = nvt_conf.read_data().reset_sess
       if reset_sess then
-        set_curr_session(aborted_task_dir, reset_sess)
+        _set_curr_session(aborted_task_dir, {sess = reset_sess})
       end
 
       nvt_conf.erase_data("reset_sess")
@@ -121,10 +128,74 @@ local function task_cb (task)
   nvt_conf.erase_data("abort_temp_save")
 end
 
-local function _new_nvim_task(sess)
-  if not sess then sess = curr_session[get_dir_prefix()] or nvt_conf.temp_sessname end
+local function curr_sess()
+  local sess_data = curr_session[get_dir_prefix()]
+  if sess_data and type(sess_data) == "string" then
+    sess_data = {sess = sess_data}
+    set_curr_session(sess_data)
+  end
+  return sess_data
+end
 
-  set_curr_session(get_dir_prefix(), sess) -- probably not necessary
+local function curr_sessname()
+  local sess_data = curr_sess()
+  return sess_data and sess_data.sess
+end
+
+local function get_curr_sess_win()
+  if not curr_task then return nil end
+
+  local win = curr_task.strategy.term.window
+  -- the session may currently be un-toggled
+  if not vim.api.nvim_win_is_valid(win) then return nil end
+
+  return win
+end
+
+local function sess_is_open()
+  return vim.api.nvim_get_current_win() == get_curr_sess_win() and vim.fn.mode() == "t"
+end
+
+-- recording started in terminal?
+local started_recording = false
+
+local reg_override = "t"
+
+vim.api.nvim_create_autocmd("User", {
+  pattern = "NvimRecorderPlay",
+  callback = function (_)
+    local sess_data = curr_sess()
+    if sess_is_open() and sess_data.recording then
+      vim.fn.setreg(reg_override, sess_data.recording, "c")
+      recorder.setRegOverride(reg_override)
+    end
+  end
+})
+
+vim.api.nvim_create_autocmd("User", {
+  pattern = "NvimRecorderRecordStart",
+  callback = function (_)
+    if sess_is_open() then
+      started_recording = true
+      recorder.setRegOverride(reg_override)
+    end
+  end
+})
+
+vim.api.nvim_create_autocmd("User", {
+  pattern = "NvimRecorderRecordEnd",
+  callback = function (data)
+    if started_recording --[[ and sess_is_open() ]] then
+      set_curr_session({recording = data.recording})
+    end
+    started_recording = false
+  end
+})
+
+local function _new_nvim_task(sess)
+  if not sess then sess = curr_sessname() or nvt_conf.temp_sessname end
+
+  set_curr_session({sess = sess}) -- probably not necessary
   print("loading task session:", sess)
 
   overseer.run_template({name = "nvim", params = {sess = sess, dir = get_dir_prefix()}}, task_cb)
@@ -155,7 +226,7 @@ local function sess_picker()
 
   return pickers
     .new({}, {
-      prompt_title = string.format("Choose session (curr: %s)", curr_session[get_dir_prefix()] or "[NONE]"),
+      prompt_title = string.format("Choose session (curr: %s)", curr_sessname() or "[NONE]"),
       finder = finders.new_table {
         results = results,
         entry_maker = make_entry.gen_from_file(),

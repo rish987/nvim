@@ -165,14 +165,7 @@ vim.api.nvim_create_autocmd("VimEnter", {
   end,
 })
 
-local recorded_register
 local set_map = {}
-
-vim.api.nvim_create_autocmd("RecordingLeave", {
-  callback = function()
-    recorded_register = vim.fn.reg_recording()
-  end,
-})
 
 local keymap_str = ':lua require"nvim-task.config".set_keymap("%s", "<c-x>", [[  ]])' .. vim.api.nvim_replace_termcodes("<C-f>bh", true, true, true)
 
@@ -217,9 +210,6 @@ end
 
 local function update_task_data()
   local task_data = {}
-  if recorded_register then
-    task_data.registers = {[recorded_register] = vim.fn.getreg(recorded_register)}
-  end
   if next(set_map) then
     task_data.map = set_map
   end

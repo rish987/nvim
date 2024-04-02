@@ -17,11 +17,11 @@ end
 ---@param data _ the value returned from on_save
 M.on_post_load = function(data)
   if data then
-    if data.registers then
-      for reg, value in pairs(data.registers) do
-        vim.fn.setreg(reg, value)
-      end
-    end
+    -- if data.registers then
+    --   for reg, value in pairs(data.registers) do
+    --     vim.fn.setreg(reg, value)
+    --   end
+    -- end
     if data.map then
       for mode, str in pairs(data.map) do
         require"nvim-task.config".set_keymap(mode, "<c-x>", str)
