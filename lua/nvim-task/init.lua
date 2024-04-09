@@ -51,6 +51,11 @@ local curr_session = vim.fn.filereadable(data_file) ~= 0 and vim.fn.json_decode(
 
 local function _set_curr_session(key, value)
   local curr_data = curr_session[key] or {}
+  -- REMOVEME: back-compat
+  if type(curr_data) == "string" then
+    curr_data = {sess = curr_data}
+  end
+
   curr_data = vim.tbl_extend("keep", value, curr_data)
   curr_session[key] = curr_data
 

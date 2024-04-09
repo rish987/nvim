@@ -1,6 +1,7 @@
 return {
   'nvim-focus/focus.nvim',
-  enabled = not vim.g.StartedByNvimTask,
+  -- enabled = not vim.g.StartedByNvimTask,
+  enabled = false,
   opts = {},
   init = function ()
     local ignore_filetypes = require"config_util".exclude_filetypes
