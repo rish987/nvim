@@ -1,9 +1,5 @@
 local M = {}
 
-M.get_sessiondir = function(dir)
-  return "nvim-task/" .. dir
-end
-
 M.saved_sessname = "NvimTask_saved"
 M.temp_sessname = "NvimTask_curr"
 
@@ -17,9 +13,9 @@ M.session_exists = function(sessname, sessdir)
   return file_exists(sess_filename)
 end
 
-local data_file = vim.fn.stdpath("data") .. "/" .. "nvim-task-state.json"
+local log = require"vim.lsp.log"
 
-function M.read_data()
+function M.read_data(data_file)
   if vim.fn.filereadable(data_file) ~= 0 then
     local ret = {}
     local readfn = function ()
@@ -33,23 +29,26 @@ function M.read_data()
 
     if not success then print("error reading json file") return {} end
     -- print('DBG[2]: config.lua:30: txt=' .. vim.inspect(txt))
+
+    -- log.error( data_file .. "reading: " .. vim.inspect(ret))
     return ret
   else
     return {}
   end
 end
 
-function M.erase_data(key)
-  local data = M.read_data()
+function M.erase_data(data_file, key)
+  local data = M.read_data(data_file)
   data[key] = nil
 
   local json = vim.fn.json_encode(data)
   vim.fn.writefile({json}, data_file)
 end
 
-function M.write_data(new_data)
-  local data = vim.tbl_extend("keep", new_data, M.read_data())
+function M.write_data(data_file, new_data)
+  local data = vim.tbl_extend("keep", new_data, M.read_data(data_file))
 
+  -- log.error( data_file .. " writing: " .. vim.inspect(data))
   local json = vim.fn.json_encode(data)
   vim.fn.writefile({json}, data_file)
 end
@@ -115,17 +114,17 @@ function M.msgview_enable()
   msgview_enabled = true
 end
 
-if vim.v.vim_did_enter == 0 then
-  -- Schedule loading after VimEnter. Get the UI up and running first.
-  vim.api.nvim_create_autocmd("VimEnter", {
-    once = true,
-    callback = M.msgview_enable
-,
-  })
-else
-  -- Schedule on the event loop
-  vim.schedule(M.msgview_enable)
-end
+-- if vim.v.vim_did_enter == 0 then
+--   -- Schedule loading after VimEnter. Get the UI up and running first.
+--   vim.api.nvim_create_autocmd("VimEnter", {
+--     once = true,
+--     callback = M.msgview_enable
+-- ,
+--   })
+-- else
+--   -- Schedule on the event loop
+--   vim.schedule(M.msgview_enable)
+-- end
 
 -- vim.keymap.set("n", "<leader>x", function ()
 --   print("HERE")
@@ -134,7 +133,8 @@ end
 --   prin("HERE")
 -- end)
 
-local sessiondir = M.get_sessiondir(vim.g.NvimTaskDir)
+local sessiondir = vim.g.NvimTaskSessionDir
+print('DBG[2]: config.lua:133: sessiondir=' .. vim.inspect(sessiondir))
 
 vim.keymap.set("n", "<leader>S", function () -- save to default slot
   resession.save(M.saved_sessname, { dir = sessiondir })
@@ -182,7 +182,6 @@ vim.keymap.set("n", "<leader>Xi", function ()
   vim.fn.feedkeys(keymap_str:format("i"))
 end)
 
-local log = require"vim.lsp.log"
 -- resession-generic
 local function _modify_data(name, opts, modify_fn)
   if not name then
@@ -220,10 +219,11 @@ end
 
 vim.api.nvim_create_autocmd("VimLeavePre", {
   callback = function()
-    local abort_temp_save = M.read_data().abort_temp_save
+    local abort_temp_save = M.read_data(vim.g.NvimTaskStateFile).abort_temp_save
+    -- log.error( "abort_temp_save: " .. vim.inspect(abort_temp_save))
 
     local sess = get_session_name()
-    M.write_data({reset_sess = sess})
+    M.write_data(vim.g.NvimTaskStateFile, {reset_sess = sess})
 
     if sess == M.temp_sessname and not abort_temp_save then -- only auto-save temporary session
       resession.save(sess, { dir = sessiondir, notify = false })

@@ -10,6 +10,16 @@ local conf = require("telescope.config").values
 local resession = require"resession"
 local recorder = require"recorder"
 
+local dir = vim.g.StartedByNvimTask and "nvim-task-nested" or "nvim-task"
+local root_dir = vim.fn.stdpath("data") .. "/" .. dir
+vim.fn.mkdir(root_dir, "p")
+
+local get_sessiondir = function(_dir)
+  return dir .. "/sessions/" .. _dir
+end
+
+local state_file = root_dir .. "/nvim-task-state.json"
+
 local nvt_conf = require "nvim-task.config"
 
 -- local get_source_files = function()
@@ -39,13 +49,12 @@ local nvt_conf = require "nvim-task.config"
 --
 -- local config_file = script_path() .. get_path_separator() .. "config.lua"
 --
-if vim.g.StartedByNvimTask then return end
 
 local function get_dir_prefix()
   return (vim.fn.getcwd()):sub(2):gsub("/", "_")
 end
 
-local data_file = vim.fn.stdpath("data") .. "/" .. "nvim-task.json"
+local data_file = root_dir .. "/nvim-task.json"
 local curr_session = vim.fn.filereadable(data_file) ~= 0 and vim.fn.json_decode(vim.fn.readfile(data_file)) or {}
 -- TODO save/load from file
 
@@ -74,7 +83,8 @@ local templates = {
         cmd = { "nvim" },
         args = {
           "--cmd", 'let g:StartedByNvimTask = "true"',
-          "--cmd", ('let g:NvimTaskDir = "%s"'):format(params.dir),
+          "--cmd", ('let g:NvimTaskStateFile = "%s"'):format(state_file),
+          "--cmd", ('let g:NvimTaskSessionDir = "%s"'):format(params.dir),
           "--cmd", ('let g:NvimTaskSession = "%s"'):format(params.sess),
         },
         strategy = "toggleterm",
@@ -101,12 +111,12 @@ local abort_curr_task = function (cb)
     -- FIXME somehow properly wait for the task above to actually exit
     vim.schedule(function ()
       -- the old task may have saved a new session, if so update curr_session to use that one next time
-      local reset_sess = nvt_conf.read_data().reset_sess
+      local reset_sess = nvt_conf.read_data(state_file).reset_sess
       if reset_sess then
         _set_curr_session(aborted_task_dir, {sess = reset_sess})
       end
 
-      nvt_conf.erase_data("reset_sess")
+      nvt_conf.erase_data(state_file, "reset_sess")
 
       if cb then cb() end
     end)
@@ -130,7 +140,7 @@ local function task_cb (task)
   curr_task = task
   curr_task_dir = get_dir_prefix()
 
-  nvt_conf.erase_data("abort_temp_save")
+  nvt_conf.erase_data(state_file, "abort_temp_save")
 end
 
 local function curr_sess()
@@ -203,7 +213,7 @@ local function _new_nvim_task(sess)
   set_curr_session({sess = sess}) -- probably not necessary
   print("loading task session:", sess)
 
-  overseer.run_template({name = "nvim", params = {sess = sess, dir = get_dir_prefix()}}, task_cb)
+  overseer.run_template({name = "nvim", params = {sess = sess, dir = get_sessiondir(get_dir_prefix())}}, task_cb)
 end
 
 local function new_nvim_task(sess)
@@ -215,7 +225,7 @@ end
 local function sess_picker()
   local results = {}
 
-  local sessions = resession.list({ dir = nvt_conf.get_sessiondir(get_dir_prefix()) })
+  local sessions = resession.list({ dir = get_sessiondir(get_dir_prefix()) })
   if vim.tbl_isempty(sessions) then
     vim.notify("No saved sessions for this directory", vim.log.levels.WARN)
     return
@@ -266,10 +276,10 @@ local function save_restart()
 end
 
 local function blank_sess()
-  nvt_conf.write_data({abort_temp_save = true})
+  nvt_conf.write_data(state_file, {abort_temp_save = true})
 
-  if nvt_conf.session_exists(nvt_conf.temp_sessname, nvt_conf.get_sessiondir(get_dir_prefix())) then
-    resession.delete(nvt_conf.temp_sessname, { dir = nvt_conf.get_sessiondir(get_dir_prefix()) })
+  if nvt_conf.session_exists(nvt_conf.temp_sessname, get_sessiondir(get_dir_prefix())) then
+    resession.delete(nvt_conf.temp_sessname, { dir = get_sessiondir(get_dir_prefix()) })
   end
 
   new_nvim_task(nvt_conf.temp_sessname)
