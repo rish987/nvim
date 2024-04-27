@@ -280,10 +280,10 @@ local tab_actions = function()
   }
 
   return {
+    jump_endpairs,
     luasnip_expand,
     luasnip_jump,
     cmp_confirm,
-    jump_endpairs,
     jump_endline,
     newline,
   }

@@ -224,6 +224,7 @@ vim.cmd([[
   autocmd FileType rust set tabstop=2
   autocmd FileType tex set shiftwidth=2
   autocmd FileType tex set tabstop=2
+  inoremap <silent> <Esc> <C-O>:stopinsert<CR>
 
   autocmd TermOpen * setlocal nonumber
 
