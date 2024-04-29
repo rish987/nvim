@@ -30,15 +30,17 @@ return {
   {
     "famiu/bufdelete.nvim"
   },
-  { "tenxsoydev/karen-yank.nvim", config = function ()
-    require"karen-yank".setup({
-      mappings = {
-        karen = "y",
-        invert = true
-      }
-    })
-    vim.api.nvim_create_augroup("KarenYank", {clear = true})
-  end },
+  { "tenxsoydev/karen-yank.nvim",
+    enabled = false,
+    config = function ()
+      require"karen-yank".setup({
+        mappings = {
+          karen = "y",
+          invert = true
+        }
+      })
+      vim.api.nvim_create_augroup("KarenYank", {clear = true})
+    end },
   {
     "ton/vim-bufsurf",
     init = function ()

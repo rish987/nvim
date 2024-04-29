@@ -22,6 +22,7 @@ return {
     end,
     config = function (_, _)
       require("luasnip.loaders.from_vscode").lazy_load()
+      require("luasnip.loaders.from_vscode").lazy_load({ paths = { "./snippets" } }) -- FIXME doesn't load
     end
   }
 }

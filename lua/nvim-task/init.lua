@@ -201,7 +201,7 @@ vim.api.nvim_create_autocmd("User", {
   pattern = "NvimRecorderRecordEnd",
   callback = function (data)
     if started_recording --[[ and sess_is_open() ]] then
-      set_curr_session({recording = data.recording})
+      set_curr_session({recording = data.data.recording})
     end
     started_recording = false
   end
