@@ -131,18 +131,6 @@ vim.api.nvim_create_autocmd("QuitPre", { -- makes sure that the last session sta
   end,
 })
 
--- vim.keymap.set("n", "<leader><leader>", function()
---   vim.cmd.rshada({bang = true})
---   print("reset sess value:", vim.g.NVIM_TASK_RESET_SESS)
--- end)
-
-local function task_cb (task)
-  curr_task = task
-  curr_task_dir = get_dir_prefix()
-
-  nvt_conf.erase_data(state_file, "abort_temp_save")
-end
-
 local function curr_sess()
   local sess_data = curr_session[get_dir_prefix()]
   if sess_data and type(sess_data) == "string" then
@@ -171,6 +159,32 @@ local function sess_is_open()
   return vim.api.nvim_get_current_win() == get_curr_sess_win() and vim.fn.mode() == "t"
 end
 
+-- vim.keymap.set("n", "<leader><leader>", function()
+--   vim.cmd.rshada({bang = true})
+--   print("reset sess value:", vim.g.NVIM_TASK_RESET_SESS)
+-- end)
+local play_recording_shortcut = "<tab>"
+local _play_recording_shortcut = vim.api.nvim_replace_termcodes(play_recording_shortcut, true, true, true)
+
+local function maybe_play_recording()
+  local sess_data = curr_sess()
+  if vim.fn.reg_recording() == "" and sess_data.recording then
+    require"recorder".playRecording()
+    return
+  end
+  vim.fn.feedkeys(_play_recording_shortcut)
+end
+
+-- TODO status line indicator for current recording and keymap to clear recording
+
+local function task_cb (task)
+  curr_task = task
+  curr_task_dir = get_dir_prefix()
+  vim.keymap.set("t", play_recording_shortcut, maybe_play_recording, {buffer = task.strategy.term.buffer})
+
+  nvt_conf.erase_data(state_file, "abort_temp_save")
+end
+
 -- recording started in terminal?
 local started_recording = false
 
@@ -179,10 +193,12 @@ local reg_override = "t"
 vim.api.nvim_create_autocmd("User", {
   pattern = "NvimRecorderPlay",
   callback = function (_)
-    local sess_data = curr_sess()
-    if sess_is_open() and sess_data.recording then
-      vim.fn.setreg(reg_override, sess_data.recording, "c")
-      recorder.setRegOverride(reg_override)
+    if sess_is_open() then
+      local sess_data = curr_sess()
+      if sess_data.recording then
+        vim.fn.setreg(reg_override, sess_data.recording, "c")
+        recorder.setRegOverride(reg_override)
+      end
     end
   end
 })
