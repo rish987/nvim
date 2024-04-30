@@ -49,6 +49,21 @@ return {
     end
   },
   -- {
+  --   "git@github.com:AckslD/messages.nvim.git",
+  --   config = true
+  -- },
+  {
+    "ariel-frischer/bmessages.nvim",
+    lazy = false,
+    priority = 1000,
+		config = function()
+      require"bmessages".setup()
+      if vim.g.StartedByNvimTask then
+      end
+		end,
+    opts = {}
+  },
+  -- {
   --   "direnv/direnv.vim",
   -- },
 }

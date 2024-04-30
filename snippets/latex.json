@@ -1,0 +1,7 @@
+{
+    "quote": {
+        "prefix": "xx",
+        "body": "``$1''$2",
+        "description": "quotation marks"
+    },
+}

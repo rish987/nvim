@@ -55,69 +55,19 @@ if not vim.g.StartedByNvimTask then return M end
 
 vim.o.swapfile = false
 
-local msgview_buf, msgview_win
-
-function M.open_messageview()
-  if msgview_buf then return end
-
-  local orig_win = vim.api.nvim_get_current_win()
-  msgview_buf = vim.api.nvim_create_buf(false, true)
-  vim.bo[msgview_buf].ft = "NvimTaskMsgView"
-  -- FIXME use vim.api.nvim_open_win instead (recent feature)
-  vim.cmd("rightbelow vsplit")
-  vim.api.nvim_win_set_buf(0, msgview_buf)
-  msgview_win = vim.api.nvim_get_current_win()
-  vim.cmd("set winfixwidth")
-  vim.cmd("set winfixwidth")
-  vim.cmd("vertical resize 80")
-  vim.api.nvim_set_current_win(orig_win)
-end
-
 M.ns = vim.api.nvim_create_namespace("nvim-task")
-local ui_opts = {
-  ext_messages = true,
-  ext_cmdline = true,
-  ext_popupmenu = true
-}
 
 local msgview_enabled = false
 
 function M.msgview_enable()
   if msgview_enabled then return end
-  vim.ui_attach(M.ns, ui_opts, function(event, kind, msg_data, _)
-    if event ~= "msg_show" then return end
-    if not msgview_win then M.open_messageview() end
-
-    local msgs_text = vim.api.nvim_buf_get_text(msgview_buf, 0, 0, -1, -1, {})
-    local num_lines = #msgs_text
-    local last_line_length = #msgs_text[num_lines]
-
-    local cursorpos = vim.api.nvim_win_get_cursor(msgview_win)
-    local at_bottom = cursorpos[1] == num_lines
-
-    local msg_text = msg_data[1][2]
-    msg_text = vim.fn.join(vim.tbl_map(function(value) return "  " .. value end, vim.split(msg_text, "\n")), "\n")
-    local msg = vim.split(("(%s, %s):\n%s"):format(event, kind or "[nil]", msg_text), "\n")
-
-    local new_text = last_line_length == 0 and msg or {"", unpack(msg)}
-    vim.api.nvim_buf_set_text(msgview_buf, num_lines - 1, last_line_length, num_lines - 1, last_line_length, new_text)
-
-    -- autoscroll
-    if at_bottom then
-      vim.fn.win_execute(msgview_win, "normal! G")
-    end
-  end)
+	require("bmessages").toggle({ split_type = "vsplit", keep_focus = true, split_size_vsplit = 80, split_direction = "botright"})
   msgview_enabled = true
 end
 
-vim.schedule(M.msgview_enable)
-
--- vim.keymap.set("n", "<leader>x", function ()
---   print("HERE")
--- end)
--- vim.keymap.set("n", "<leader>X", function ()
---   prin("HERE")
--- end)
+vim.keymap.set("n", "<leader>xn", function ()
+  print("HERE")
+end)
 
 local sessiondir = vim.g.NvimTaskSessionDir
 
@@ -142,12 +92,13 @@ local function get_session_name()
 end
 
 vim.api.nvim_create_autocmd("VimEnter", {
-  callback = function()
+  callback = vim.schedule_wrap(function()
     local sess = get_session_name()
     if M.session_exists(sess, sessiondir) then
       require"resession".load(sess, { dir = sessiondir, silence_errors = true })
+      M.msgview_enable()
     end
-  end,
+  end),
 })
 
 local set_map = {}

@@ -1,6 +1,7 @@
 return {
   {
     'nvim-lualine/lualine.nvim',
+    -- enabled = false,
     lazy = false,
     config = true,
     dependencies = {
