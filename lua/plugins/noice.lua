@@ -1,7 +1,8 @@
 return {
   "folke/noice.nvim",
-  enabled = true,
-  priority = 1000,
+  -- enabled = not vim.g.StartedByNvimTask,
+  enabled = false,
+  -- priority = 1000,
   lazy = false,
   opts = {
     lsp = {

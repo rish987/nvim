@@ -28,8 +28,6 @@ function M.read_data(data_file)
     end
 
     if not success then print("error reading json file") return {} end
-    -- print('DBG[2]: config.lua:30: txt=' .. vim.inspect(txt))
-
     -- log.error( data_file .. "reading: " .. vim.inspect(ret))
     return ret
   else
@@ -56,8 +54,6 @@ end
 if not vim.g.StartedByNvimTask then return M end
 
 vim.o.swapfile = false
-
-local resession = require"resession"
 
 local msgview_buf, msgview_win
 
@@ -114,17 +110,7 @@ function M.msgview_enable()
   msgview_enabled = true
 end
 
--- if vim.v.vim_did_enter == 0 then
---   -- Schedule loading after VimEnter. Get the UI up and running first.
---   vim.api.nvim_create_autocmd("VimEnter", {
---     once = true,
---     callback = M.msgview_enable
--- ,
---   })
--- else
---   -- Schedule on the event loop
---   vim.schedule(M.msgview_enable)
--- end
+vim.schedule(M.msgview_enable)
 
 -- vim.keymap.set("n", "<leader>x", function ()
 --   print("HERE")
@@ -134,14 +120,13 @@ end
 -- end)
 
 local sessiondir = vim.g.NvimTaskSessionDir
-print('DBG[2]: config.lua:133: sessiondir=' .. vim.inspect(sessiondir))
 
 vim.keymap.set("n", "<leader>S", function () -- save to default slot
-  resession.save(M.saved_sessname, { dir = sessiondir })
+  require"resession".save(M.saved_sessname, { dir = sessiondir })
 end)
 
 vim.keymap.set("n", "<leader>F", function () -- save a new session
-  resession.save(nil, { dir = sessiondir })
+  require"resession".save(nil, { dir = sessiondir })
 end)
 
 vim.keymap.set("n", "<leader>A", function ()
@@ -150,7 +135,7 @@ end)
 
 -- Gets the current session name, reading vim.g.NvimTaskSession if no session is loaded yet.
 local function get_session_name()
-  local curr_sessname = resession.get_current()
+  local curr_sessname = require"resession".get_current()
   if curr_sessname then return curr_sessname end
 
   return vim.g.NvimTaskSession
@@ -160,7 +145,7 @@ vim.api.nvim_create_autocmd("VimEnter", {
   callback = function()
     local sess = get_session_name()
     if M.session_exists(sess, sessiondir) then
-      resession.load(sess, { dir = sessiondir, silence_errors = true })
+      require"resession".load(sess, { dir = sessiondir, silence_errors = true })
     end
   end,
 })
@@ -194,7 +179,6 @@ local function _modify_data(name, opts, modify_fn)
   local filename = util.get_session_file(name, opts.dir)
   local data = modify_fn(files.load_json_file(filename))
   files.write_json_file(filename, data)
-  print(filename, vim.inspect{data["nvim-task"]})
 end
 
 local function modify_data(new_task_data)
@@ -226,7 +210,7 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
     M.write_data(vim.g.NvimTaskStateFile, {reset_sess = sess})
 
     if sess == M.temp_sessname and not abort_temp_save then -- only auto-save temporary session
-      resession.save(sess, { dir = sessiondir, notify = false })
+      require"resession".save(sess, { dir = sessiondir, notify = false })
     end
 
     update_task_data()

@@ -52,6 +52,8 @@ require("rooter")
 
 require("alternate")
 
+require("nvim-task") -- need to put at top so that any plugin startup print messages can be caught by messageview
+
 require("lazy").setup("plugins",
   {
     dev = {
@@ -100,8 +102,6 @@ vim.api.nvim_create_autocmd("WinClosed", {
 require("multifun")
 
 require("jump-textobj")
-
-require("nvim-task")
 
 local locations_to_items = vim.lsp.util.locations_to_items
 vim.lsp.util.locations_to_items = function (locations, offset_encoding)

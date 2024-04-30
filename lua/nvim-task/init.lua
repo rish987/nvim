@@ -1,15 +1,3 @@
-local overseer = require("overseer")
-local actions = require "telescope.actions"
--- local sorters = require "telescope.sorters"
-local action_state = require "telescope.actions.state"
-local finders = require "telescope.finders"
-local make_entry = require "telescope.make_entry"
-local pickers = require "telescope.pickers"
--- local utils = require "telescope.utils"
-local conf = require("telescope.config").values
-local resession = require"resession"
-local recorder = require"recorder"
-
 local dir = vim.g.StartedByNvimTask and "nvim-task-nested" or "nvim-task"
 local root_dir = vim.fn.stdpath("data") .. "/" .. dir
 vim.fn.mkdir(root_dir, "p")
@@ -197,7 +185,7 @@ vim.api.nvim_create_autocmd("User", {
       local sess_data = curr_sess()
       if sess_data.recording then
         vim.fn.setreg(reg_override, sess_data.recording, "c")
-        recorder.setRegOverride(reg_override)
+        require"recorder".setRegOverride(reg_override)
       end
     end
   end
@@ -208,7 +196,7 @@ vim.api.nvim_create_autocmd("User", {
   callback = function (_)
     if sess_is_open() then
       started_recording = true
-      recorder.setRegOverride(reg_override)
+      require"recorder".setRegOverride(reg_override)
     end
   end
 })
@@ -223,11 +211,23 @@ vim.api.nvim_create_autocmd("User", {
   end
 })
 
+local templates_registered = false
+
 local function _new_nvim_task(sess)
+  local overseer = require("overseer")
   if not sess then sess = curr_sessname() or nvt_conf.temp_sessname end
 
   set_curr_session({sess = sess}) -- probably not necessary
   print("loading task session:", sess)
+
+  if not templates_registered then
+    for name, template in pairs(templates) do
+      template.name = name
+      overseer.register_template(template)
+    end
+
+    templates_registered = true
+  end
 
   overseer.run_template({name = "nvim", params = {sess = sess, dir = get_sessiondir(get_dir_prefix())}}, task_cb)
 end
@@ -239,9 +239,16 @@ local function new_nvim_task(sess)
 end
 
 local function sess_picker()
+  local actions = require "telescope.actions"
+  local action_state = require "telescope.actions.state"
+  local finders = require "telescope.finders"
+  local make_entry = require "telescope.make_entry"
+  local pickers = require "telescope.pickers"
+  local conf = require("telescope.config").values
+
   local results = {}
 
-  local sessions = resession.list({ dir = get_sessiondir(get_dir_prefix()) })
+  local sessions = require"resession".list({ dir = get_sessiondir(get_dir_prefix()) })
   if vim.tbl_isempty(sessions) then
     vim.notify("No saved sessions for this directory", vim.log.levels.WARN)
     return
@@ -277,11 +284,6 @@ local function sess_picker()
     })
 end
 
-for name, template in pairs(templates) do
-  template.name = name
-  overseer.register_template(template)
-end
-
 local function restart()
   new_nvim_task()
 end
@@ -295,7 +297,7 @@ local function blank_sess()
   nvt_conf.write_data(state_file, {abort_temp_save = true})
 
   if nvt_conf.session_exists(nvt_conf.temp_sessname, get_sessiondir(get_dir_prefix())) then
-    resession.delete(nvt_conf.temp_sessname, { dir = get_sessiondir(get_dir_prefix()) })
+    require"resession".delete(nvt_conf.temp_sessname, { dir = get_sessiondir(get_dir_prefix()) })
   end
 
   new_nvim_task(nvt_conf.temp_sessname)

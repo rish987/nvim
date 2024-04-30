@@ -80,7 +80,7 @@ return {
       telescope.load_extension'zoxide'
       telescope.load_extension'egrepify'
       telescope.load_extension'repo'
-      telescope.load_extension'noice'
+      if package.loaded["noice"] then telescope.load_extension'noice' end
       telescope.load_extension'yank_history'
     end,
     opts = function ()
