@@ -110,13 +110,13 @@ function M.set_keymap(mode, map, str)
   set_map[mode] = str
 end
 
-vim.keymap.set("n", "<leader>Xn", function ()
-  vim.fn.feedkeys(keymap_str:format("n"))
-end)
-
-vim.keymap.set("n", "<leader>Xi", function ()
-  vim.fn.feedkeys(keymap_str:format("i"))
-end)
+-- vim.keymap.set("n", "<leader>Xn", function ()
+--   vim.fn.feedkeys(keymap_str:format("n"))
+-- end)
+--
+-- vim.keymap.set("n", "<leader>Xi", function ()
+--   vim.fn.feedkeys(keymap_str:format("i"))
+-- end)
 
 -- resession-generic
 local function _modify_data(name, opts, modify_fn)

@@ -1,3 +1,5 @@
+local M = {}
+
 local dir = vim.g.StartedByNvimTask and "nvim-task-nested" or "nvim-task"
 local root_dir = vim.fn.stdpath("data") .. "/" .. dir
 vim.fn.mkdir(root_dir, "p")
@@ -86,7 +88,8 @@ local templates = {
 
 local curr_task, curr_task_dir
 
-local abort_curr_task = function (cb)
+--- TODO make async
+M.abort_curr_task = function (cb)
   if curr_task then
     curr_task:stop()
     curr_task:dispose()
@@ -115,7 +118,7 @@ end
 
 vim.api.nvim_create_autocmd("QuitPre", { -- makes sure that the last session state is saved before quitting
   callback = function(_)
-    abort_curr_task()
+    M.abort_curr_task()
   end,
 })
 
@@ -151,8 +154,14 @@ end
 --   vim.cmd.rshada({bang = true})
 --   print("reset sess value:", vim.g.NVIM_TASK_RESET_SESS)
 -- end)
-local play_recording_shortcut = "<tab>"
-local _play_recording_shortcut = vim.api.nvim_replace_termcodes(play_recording_shortcut, true, true, true)
+local sess_leader = vim.g.StartedByNvimTask and "<C-A-x>" or "<C-x>"
+local sess_mappings = {
+  play_recording_shortcut = "<tab>",
+  restart_session = sess_leader .. "r",
+  exit_session = sess_leader .. "x",
+  duplicate_session = sess_leader .. "d",
+  delete_session = sess_leader .. "D",
+}
 
 local function maybe_play_recording()
   local sess_data = curr_sess()
@@ -160,7 +169,7 @@ local function maybe_play_recording()
     require"recorder".playRecording()
     return
   end
-  vim.fn.feedkeys(_play_recording_shortcut)
+  vim.fn.feedkeys(vim.api.nvim_replace_termcodes(sess_mappings.play_recording_shortcut, true, true, true))
 end
 
 -- TODO status line indicator for current recording and keymap to clear recording
@@ -168,7 +177,13 @@ end
 local function task_cb (task)
   curr_task = task
   curr_task_dir = get_dir_prefix()
-  vim.keymap.set("t", play_recording_shortcut, maybe_play_recording, {buffer = task.strategy.term.buffer})
+  local buf = task.strategy.term.buffer
+  vim.keymap.set("t", sess_mappings.play_recording_shortcut, maybe_play_recording, {buffer = buf})
+  vim.keymap.set("t", sess_mappings.exit_session, function () M.abort_curr_task(function() task.strategy.term:close() end) end, {buffer = buf})
+  vim.keymap.set("t", sess_mappings.restart_session, function () M.restart(function() task.strategy.term:close() end) end, {buffer = buf})
+
+  -- TODO investigate why toggleterm's use of `:startinsert` doesn't cut it here
+  vim.fn.feedkeys("i")
 
   nvt_conf.erase_data(state_file, "abort_temp_save")
 end
@@ -184,7 +199,7 @@ vim.api.nvim_create_autocmd("User", {
     if sess_is_open() then
       local sess_data = curr_sess()
       if sess_data.recording then
-        vim.fn.setreg(reg_override, sess_data.recording, "c")
+        vim.fn.setreg(reg_override, vim.api.nvim_replace_termcodes(sess_data.recording, true, true, true), "c")
         require"recorder".setRegOverride(reg_override)
       end
     end
@@ -232,13 +247,13 @@ local function _new_nvim_task(sess)
   overseer.run_template({name = "nvim", params = {sess = sess, dir = get_sessiondir(get_dir_prefix())}}, task_cb)
 end
 
-local function new_nvim_task(sess)
-  if not abort_curr_task(function() _new_nvim_task(sess) end) then
+local function new_nvim_task(sess, cb)
+  if not M.abort_curr_task(function() if cb then cb() end _new_nvim_task(sess) end) then
     _new_nvim_task(sess)
   end
 end
 
-local function sess_picker()
+function M.sess_picker()
   local actions = require "telescope.actions"
   local action_state = require "telescope.actions.state"
   local finders = require "telescope.finders"
@@ -284,16 +299,16 @@ local function sess_picker()
     })
 end
 
-local function restart()
-  new_nvim_task()
+function M.restart(cb)
+  new_nvim_task(nil, cb)
 end
 
-local function save_restart()
+function M.save_restart()
   vim.cmd("write")
-  restart()
+  M.restart()
 end
 
-local function blank_sess()
+function M.blank_sess()
   nvt_conf.write_data(state_file, {abort_temp_save = true})
 
   if nvt_conf.session_exists(nvt_conf.temp_sessname, get_sessiondir(get_dir_prefix())) then
@@ -303,11 +318,13 @@ local function blank_sess()
   new_nvim_task(nvt_conf.temp_sessname)
 end
 
-vim.keymap.set("n", "<leader>W", function () save_restart() end)
-vim.keymap.set("n", "<leader>X", function () restart() end)
-vim.keymap.set("n", "<leader>xx", function () abort_curr_task() end)
-vim.keymap.set("n", "<leader>xf", function () sess_picker():find() end)
-vim.keymap.set("n", "<leader>xb", function () blank_sess() end)
+vim.keymap.set("n", "<leader>W", function () M.save_restart() end)
+vim.keymap.set("n", "<leader>X", function () M.restart() end)
+vim.keymap.set("n", "<leader>xx", function () M.abort_curr_task() end)
+vim.keymap.set("n", "<leader>xf", function () M.sess_picker():find() end)
+vim.keymap.set("n", "<leader>xb", function () M.blank_sess() end)
+
+return M
 
 -- TODO mapping to open telescope to select explicitly saved sessions (under cwd)
 -- TODO mapping to clear saved session

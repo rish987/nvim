@@ -106,7 +106,7 @@ require("nvim-task")
 local locations_to_items = vim.lsp.util.locations_to_items
 vim.lsp.util.locations_to_items = function (locations, offset_encoding)
   local lines = {}
-  local loc_i = 1
+  local loc_i = 0
   for _, loc in ipairs(vim.deepcopy(locations)) do
     local uri = loc.uri or loc.targetUri
     local range = loc.range or loc.targetSelectionRange
@@ -142,17 +142,17 @@ vim.api.nvim_create_autocmd("BufRead", {
       vim.keymap.set = function (mode, lhs, rhs, opts)
         local bufs_set = {}
         local set_map_buf =
-          function ()
-            local file = vim.api.nvim_buf_get_name(0)
-            if file:match(dir) then -- FIXME better match
-              if bufs_set[file] then return end
-              -- print("CUSTOM MAP: ", lhs, file, bufs_set[file])
-              opts = opts or {}
-              opts.buffer = true
-              orig_map(mode, lhs, rhs, opts)
-              bufs_set[file] = true
-            end
+        function ()
+          local file = vim.api.nvim_buf_get_name(0)
+          if file:match(dir) then -- FIXME better match
+            if bufs_set[file] then return end
+            -- print("CUSTOM MAP: ", lhs, file, bufs_set[file])
+            opts = opts or {}
+            opts.buffer = true
+            orig_map(mode, lhs, rhs, opts)
+            bufs_set[file] = true
           end
+        end
 
         -- set for the buffer that invoked the config
         set_map_buf()
