@@ -88,39 +88,14 @@ local templates = {
 
 local curr_task, curr_task_dir
 
---- TODO make async
-M.abort_curr_task = function (cb)
-  if curr_task then
-    curr_task:stop()
-    curr_task:dispose()
-    curr_task = nil
-    local aborted_task_dir = curr_task_dir
-    curr_task_dir = nil
+local a = require"plenary.async"
+local a_util = require"plenary.async.util"
 
-    print"task aborted"
-
-    -- FIXME somehow properly wait for the task above to actually exit
-    vim.schedule(function ()
-      -- the old task may have saved a new session, if so update curr_session to use that one next time
-      local reset_sess = nvt_conf.read_data(state_file).reset_sess
-      if reset_sess then
-        _set_curr_session(aborted_task_dir, {sess = reset_sess})
-      end
-
-      nvt_conf.erase_data(state_file, "reset_sess")
-
-      if cb then cb() end
-    end)
-    return true
-  end
-  return false
+local function _wait_for_autocmd(cmds, callback)
+	vim.api.nvim_create_autocmd(cmds, { callback = callback, once = true })
 end
 
-vim.api.nvim_create_autocmd("QuitPre", { -- makes sure that the last session state is saved before quitting
-  callback = function(_)
-    M.abort_curr_task()
-  end,
-})
+local wait_for_autocmd = a.wrap(_wait_for_autocmd, 2)
 
 local function curr_sess()
   local sess_data = curr_session[get_dir_prefix()]
@@ -146,10 +121,52 @@ local function get_curr_sess_win()
   return win
 end
 
+
 local function sess_is_open()
   return vim.api.nvim_get_current_win() == get_curr_sess_win() and vim.fn.mode() == "t"
 end
 
+--- TODO make async
+M.abort_curr_task = function (cb)
+  if curr_task then
+    a.run(function()
+      local was_open = sess_is_open()
+      curr_task:stop()
+      curr_task:dispose()
+      local term = curr_task.strategy.term
+      curr_task = nil
+      require"recorder".abortPlayback(true)
+      local aborted_task_dir = curr_task_dir
+      curr_task_dir = nil
+
+      print"task aborted"
+
+      -- FIXME somehow properly wait for the task above to actually exit
+      a_util.scheduler()
+      term:close()
+      if was_open then
+        a_util.sleep(50)
+      end
+      -- the old task may have saved a new session, if so update curr_session to use that one next time
+      local reset_sess = nvt_conf.read_data(state_file).reset_sess
+      if reset_sess then
+        _set_curr_session(aborted_task_dir, {sess = reset_sess})
+      end
+
+      nvt_conf.erase_data(state_file, "reset_sess")
+
+      if cb then cb() end
+    end, function() end)
+    return true
+  end
+  return false
+end
+
+vim.api.nvim_create_autocmd("QuitPre", { -- makes sure that the last session state is saved before quitting
+  callback = function(_)
+    M.abort_curr_task()
+  end,
+})
 -- vim.keymap.set("n", "<leader><leader>", function()
 --   vim.cmd.rshada({bang = true})
 --   print("reset sess value:", vim.g.NVIM_TASK_RESET_SESS)
@@ -179,11 +196,9 @@ local function task_cb (task)
   curr_task_dir = get_dir_prefix()
   local buf = task.strategy.term.buffer
   vim.keymap.set("t", sess_mappings.play_recording_shortcut, maybe_play_recording, {buffer = buf})
-  vim.keymap.set("t", sess_mappings.exit_session, function () M.abort_curr_task(function() task.strategy.term:close() end) end, {buffer = buf})
-  vim.keymap.set("t", sess_mappings.restart_session, function () M.restart(function() task.strategy.term:close() end) end, {buffer = buf})
-
-  -- TODO investigate why toggleterm's use of `:startinsert` doesn't cut it here
-  vim.fn.feedkeys("i")
+  vim.keymap.set("t", sess_mappings.exit_session, function () M.abort_curr_task() end, {buffer = buf})
+  vim.keymap.set("t", sess_mappings.restart_session, function () M.restart() end, {buffer = buf})
+  -- vim.keymap.set("n", sess_mappings.duplicate_session, function () vim.cmd"startinsert" end, {buffer = buf})
 
   nvt_conf.erase_data(state_file, "abort_temp_save")
 end
@@ -247,8 +262,8 @@ local function _new_nvim_task(sess)
   overseer.run_template({name = "nvim", params = {sess = sess, dir = get_sessiondir(get_dir_prefix())}}, task_cb)
 end
 
-local function new_nvim_task(sess, cb)
-  if not M.abort_curr_task(function() if cb then cb() end _new_nvim_task(sess) end) then
+local function new_nvim_task(sess)
+  if not M.abort_curr_task(function() _new_nvim_task(sess) end) then
     _new_nvim_task(sess)
   end
 end
@@ -299,8 +314,8 @@ function M.sess_picker()
     })
 end
 
-function M.restart(cb)
-  new_nvim_task(nil, cb)
+function M.restart()
+  new_nvim_task(nil)
 end
 
 function M.save_restart()
