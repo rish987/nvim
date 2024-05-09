@@ -4,8 +4,8 @@ local dir = vim.g.StartedByNvimTask and "nvim-task-nested" or "nvim-task"
 local root_dir = vim.fn.stdpath("data") .. "/" .. dir
 vim.fn.mkdir(root_dir, "p")
 
-local get_sessiondir = function(_dir)
-  return dir .. "/sessions/" .. _dir
+local get_sessiondir = function()
+  return dir .. "/sessions"
 end
 
 local state_file = root_dir .. "/nvim-task-state.json"
@@ -40,30 +40,26 @@ local nvt_conf = require "nvim-task.config"
 -- local config_file = script_path() .. get_path_separator() .. "config.lua"
 --
 
-local function get_dir_prefix()
-  return (vim.fn.getcwd()):sub(2):gsub("/", "_")
-end
-
+local curr_test
 local data_file = root_dir .. "/nvim-task.json"
-local curr_session = vim.fn.filereadable(data_file) ~= 0 and vim.fn.json_decode(vim.fn.readfile(data_file)) or {}
+local tests_data = vim.fn.filereadable(data_file) ~= 0 and vim.fn.json_decode(vim.fn.readfile(data_file)) or {}
 -- TODO save/load from file
 
-local function _set_curr_session(key, value)
-  local curr_data = curr_session[key] or {}
-  -- REMOVEME: back-compat
-  if type(curr_data) == "string" then
-    curr_data = {sess = curr_data}
-  end
+local function set_test_data(test, value)
+  local curr_data = tests_data[test] or {}
 
   curr_data = vim.tbl_extend("keep", value, curr_data)
-  curr_session[key] = curr_data
+  tests_data[test] = curr_data
 
-  local json = vim.fn.json_encode(curr_session)
+  local json = vim.fn.json_encode(tests_data)
   vim.fn.writefile({json}, data_file)
 end
 
-local function set_curr_session(value)
-  _set_curr_session(get_dir_prefix(), value)
+local function del_test_data(test)
+  tests_data[test] = nil
+
+  local json = vim.fn.json_encode(tests_data)
+  vim.fn.writefile({json}, data_file)
 end
 
 local templates = {
@@ -86,7 +82,7 @@ local templates = {
   },
 }
 
-local curr_task, curr_task_dir
+local curr_task
 
 local a = require"plenary.async"
 local a_util = require"plenary.async.util"
@@ -97,21 +93,12 @@ end
 
 local wait_for_autocmd = a.wrap(_wait_for_autocmd, 2)
 
-local function curr_sess()
-  local sess_data = curr_session[get_dir_prefix()]
-  if sess_data and type(sess_data) == "string" then
-    sess_data = {sess = sess_data}
-    set_curr_session(sess_data)
-  end
-  return sess_data
+local function curr_test_data()
+  local test_data = tests_data[curr_test]
+  return test_data
 end
 
-local function curr_sessname()
-  local sess_data = curr_sess()
-  return sess_data and sess_data.sess
-end
-
-local function get_curr_sess_win()
+local function get_curr_test_win()
   if not curr_task then return nil end
 
   local win = curr_task.strategy.term.window
@@ -122,22 +109,21 @@ local function get_curr_sess_win()
 end
 
 
-local function sess_is_open()
-  return vim.api.nvim_get_current_win() == get_curr_sess_win() and vim.fn.mode() == "t"
+local function test_is_open()
+  return vim.api.nvim_get_current_win() == get_curr_test_win() and vim.fn.mode() == "t"
 end
+
+local recording_to_save
 
 --- TODO make async
 M.abort_curr_task = function (cb)
   if curr_task then
     a.run(function()
-      local was_open = sess_is_open()
+      local was_open = test_is_open()
       curr_task:stop()
       curr_task:dispose()
       local term = curr_task.strategy.term
       curr_task = nil
-      require"recorder".abortPlayback(true)
-      local aborted_task_dir = curr_task_dir
-      curr_task_dir = nil
 
       print"task aborted"
 
@@ -150,10 +136,14 @@ M.abort_curr_task = function (cb)
       -- the old task may have saved a new session, if so update curr_session to use that one next time
       local reset_sess = nvt_conf.read_data(state_file).reset_sess
       if reset_sess then
-        _set_curr_session(aborted_task_dir, {sess = reset_sess})
+        curr_test = reset_sess -- name the test after whatever the session was named under
+        set_test_data(curr_test, {sess = reset_sess, recording = recording_to_save})
       end
 
       nvt_conf.erase_data(state_file, "reset_sess")
+
+      require"recorder".abortPlayback(true)
+      recording_to_save = nil
 
       if cb then cb() end
     end, function() end)
@@ -181,19 +171,18 @@ local sess_mappings = {
 }
 
 local function maybe_play_recording()
-  local sess_data = curr_sess()
-  if vim.fn.reg_recording() == "" and sess_data.recording then
+  local sess_data = curr_test_data()
+  if sess_data and vim.fn.reg_recording() == "" and sess_data.recording then
     require"recorder".playRecording()
     return
   end
-  vim.fn.feedkeys(vim.api.nvim_replace_termcodes(sess_mappings.play_recording_shortcut, true, true, true))
+  vim.fn.feedkeys(vim.api.nvim_replace_termcodes(sess_mappings.play_recording_shortcut, true, true, true), "n")
 end
 
 -- TODO status line indicator for current recording and keymap to clear recording
 
 local function task_cb (task)
   curr_task = task
-  curr_task_dir = get_dir_prefix()
   local buf = task.strategy.term.buffer
   vim.keymap.set("t", sess_mappings.play_recording_shortcut, maybe_play_recording, {buffer = buf})
   vim.keymap.set("t", sess_mappings.exit_session, function () M.abort_curr_task() end, {buffer = buf})
@@ -211,8 +200,8 @@ local reg_override = "t"
 vim.api.nvim_create_autocmd("User", {
   pattern = "NvimRecorderPlay",
   callback = function (_)
-    if sess_is_open() then
-      local sess_data = curr_sess()
+    if test_is_open() then
+      local sess_data = curr_test_data()
       if sess_data.recording then
         vim.fn.setreg(reg_override, vim.api.nvim_replace_termcodes(sess_data.recording, true, true, true), "c")
         require"recorder".setRegOverride(reg_override)
@@ -224,7 +213,7 @@ vim.api.nvim_create_autocmd("User", {
 vim.api.nvim_create_autocmd("User", {
   pattern = "NvimRecorderRecordStart",
   callback = function (_)
-    if sess_is_open() then
+    if test_is_open() then
       started_recording = true
       require"recorder".setRegOverride(reg_override)
     end
@@ -235,7 +224,7 @@ vim.api.nvim_create_autocmd("User", {
   pattern = "NvimRecorderRecordEnd",
   callback = function (data)
     if started_recording --[[ and sess_is_open() ]] then
-      set_curr_session({recording = data.data.recording})
+      recording_to_save = data.data.recording
     end
     started_recording = false
   end
@@ -243,12 +232,12 @@ vim.api.nvim_create_autocmd("User", {
 
 local templates_registered = false
 
-local function _new_nvim_task(sess)
+local function _new_nvim_task(test)
   local overseer = require("overseer")
-  if not sess then sess = curr_sessname() or nvt_conf.temp_sessname end
+  if not test then test = curr_test or nvt_conf.temp_sessname end
 
-  set_curr_session({sess = sess}) -- probably not necessary
-  print("loading task session:", sess)
+  curr_test = test
+  print("loading test:", test)
 
   if not templates_registered then
     for name, template in pairs(templates) do
@@ -259,7 +248,7 @@ local function _new_nvim_task(sess)
     templates_registered = true
   end
 
-  overseer.run_template({name = "nvim", params = {sess = sess, dir = get_sessiondir(get_dir_prefix())}}, task_cb)
+  overseer.run_template({name = "nvim", params = {sess = test, dir = get_sessiondir()}}, task_cb)
 end
 
 local function new_nvim_task(sess)
@@ -278,23 +267,22 @@ function M.sess_picker()
 
   local results = {}
 
-  local sessions = require"resession".list({ dir = get_sessiondir(get_dir_prefix()) })
-  if vim.tbl_isempty(sessions) then
-    vim.notify("No saved sessions for this directory", vim.log.levels.WARN)
-    return
+  for test, _ in pairs(tests_data) do
+    if test ~= nvt_conf.temp_sessname then
+      table.insert(results, test)
+    end
   end
 
-  for _, session in ipairs(sessions) do
-    if session ~= nvt_conf.temp_sessname then
-      table.insert(results, session)
-    end
+  if vim.tbl_isempty(results) then
+    vim.notify("No saved tests", vim.log.levels.WARN)
+    return
   end
 
   local opts = {}
 
   return pickers
     .new({}, {
-      prompt_title = string.format("Choose session (curr: %s)", curr_sessname() or "[NONE]"),
+      prompt_title = string.format("Choose test (curr: %s)", curr_test or "[NONE]"),
       finder = finders.new_table {
         results = results,
         entry_maker = make_entry.gen_from_file(),
@@ -315,7 +303,7 @@ function M.sess_picker()
 end
 
 function M.restart()
-  new_nvim_task(nil)
+  new_nvim_task()
 end
 
 function M.save_restart()
@@ -326,8 +314,9 @@ end
 function M.blank_sess()
   nvt_conf.write_data(state_file, {abort_temp_save = true})
 
-  if nvt_conf.session_exists(nvt_conf.temp_sessname, get_sessiondir(get_dir_prefix())) then
-    require"resession".delete(nvt_conf.temp_sessname, { dir = get_sessiondir(get_dir_prefix()) })
+  if nvt_conf.session_exists(nvt_conf.temp_sessname, get_sessiondir()) then
+    require"resession".delete(nvt_conf.temp_sessname, { dir = get_sessiondir() })
+    del_test_data(nvt_conf.temp_sessname)
   end
 
   new_nvim_task(nvt_conf.temp_sessname)
