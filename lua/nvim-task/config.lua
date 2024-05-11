@@ -74,9 +74,12 @@ end)
 
 local sessiondir = vim.g.NvimTaskSessionDir
 
-vim.keymap.set("n", "<leader>S", function () -- save to default slot
+function M.save_session () -- save to default slot
+  -- FIXME do this without setting any "state" w.r.t the current session
   require"resession".save(M.saved_sessname, { dir = sessiondir })
-end)
+end
+
+vim.keymap.set("n", "<leader>S", M.save_session)
 
 vim.keymap.set("n", "<leader>F", function () -- save a new session
   vim.ui.input({ prompt = "Session name" }, function(name)
@@ -159,15 +162,16 @@ local function update_task_data()
   end
 end
 
+local abort_temp_save = false
+
+function M.abort_temp_save()
+  abort_temp_save = true
+end
+
 vim.api.nvim_create_autocmd("VimLeavePre", {
   callback = function()
-    local abort_temp_save = M.read_data(vim.g.NvimTaskStateFile).abort_temp_save
-    -- log.error( "abort_temp_save: " .. vim.inspect(abort_temp_save))
-
     local sess = get_session_name()
-    M.write_data(vim.g.NvimTaskStateFile, {reset_sess = sess})
-
-    if sess == M.temp_sessname and not abort_temp_save then -- only auto-save temporary session
+    if sess == M.temp_sessname and not abort_temp_save then -- auto-save temporary session
       require"resession".save(sess, { dir = sessiondir, notify = false })
     end
 

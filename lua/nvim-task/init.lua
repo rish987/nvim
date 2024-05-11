@@ -4,11 +4,7 @@ local dir = vim.g.StartedByNvimTask and "nvim-task-nested" or "nvim-task"
 local root_dir = vim.fn.stdpath("data") .. "/" .. dir
 vim.fn.mkdir(root_dir, "p")
 
-local get_sessiondir = function()
-  return dir .. "/sessions"
-end
-
-local state_file = root_dir .. "/nvim-task-state.json"
+local sessiondir = dir .. "/sessions"
 
 local nvt_conf = require "nvim-task.config"
 
@@ -83,8 +79,7 @@ local templates = {
         cmd = { "nvim" },
         args = {
           "--cmd", 'let g:StartedByNvimTask = "true"',
-          "--cmd", ('let g:NvimTaskStateFile = "%s"'):format(state_file),
-          "--cmd", ('let g:NvimTaskSessionDir = "%s"'):format(params.dir),
+          "--cmd", ('let g:NvimTaskSessionDir = "%s"'):format(sessiondir),
           "--cmd", ('let g:NvimTaskSession = "%s"'):format(params.sess),
           "--cmd", ('let g:NvimTaskParentSock = "%s"'):format(sock),
           "--listen", child_sock
@@ -129,8 +124,6 @@ local function test_is_open()
   return vim.api.nvim_get_current_win() == get_curr_test_win() and vim.fn.mode() == "t"
 end
 
-local recording_to_save
-
 local function set_curr_test(test)
   curr_test = test
   set_test_metadata({curr_test = curr_test})
@@ -155,17 +148,8 @@ M.abort_curr_task = function (cb)
       if was_open then
         a_util.sleep(50)
       end
-      -- the old task may have saved a new session, if so update curr_session to use that one next time
-      local reset_sess = nvt_conf.read_data(state_file).reset_sess
-      if reset_sess then
-        set_curr_test(reset_sess) -- name the test after whatever the session was named under
-        set_test_data(curr_test, {sess = reset_sess, recording = recording_to_save})
-      end
-
-      nvt_conf.erase_data(state_file, "reset_sess")
 
       require"recorder".abortPlayback(true)
-      recording_to_save = nil
 
       if cb then cb() end
     end, function() end)
@@ -188,6 +172,7 @@ local test_mappings = {
   play_recording_shortcut = "<tab>",
   restart_session = test_leader .. "r",
   exit_session = test_leader .. "x",
+  blank_session = test_leader .. "b",
   duplicate_session = test_leader .. "d",
   delete_session = test_leader .. "D",
 }
@@ -207,6 +192,10 @@ function M.set_child_sock()
 end
 
 -- TODO status line indicator for current recording and keymap to clear recording
+local function run_child(code, args)
+  args = args or {}
+  vim.fn.rpcrequest(curr_task.sock, "nvim_exec_lua", code, args)
+end
 
 local function task_cb (task)
   curr_task = task
@@ -214,9 +203,8 @@ local function task_cb (task)
   vim.keymap.set("t", test_mappings.play_recording_shortcut, maybe_play_recording, {buffer = buf})
   vim.keymap.set("t", test_mappings.exit_session, function () M.abort_curr_task() end, {buffer = buf})
   vim.keymap.set("t", test_mappings.restart_session, function () M.restart() end, {buffer = buf})
-  vim.keymap.set("t", test_mappings.duplicate_session, function () vim.fn.rpcrequest(task.sock, "nvim_exec_lua", "print('HERE')", {}) end, {buffer = buf})
-
-  nvt_conf.erase_data(state_file, "abort_temp_save")
+  vim.keymap.set("t", test_mappings.blank_session, function () M.blank_sess() end, {buffer = buf})
+  vim.keymap.set("t", test_mappings.duplicate_session, function () run_child(print"HERE") end, {buffer = buf})
 end
 
 -- recording started in terminal?
@@ -243,6 +231,7 @@ vim.api.nvim_create_autocmd("User", {
     if test_is_open() then
       started_recording = true
       require"recorder".setRegOverride(reg_override)
+      run_child("require'nvim-task.config'.save_session()")
     end
   end
 })
@@ -251,7 +240,18 @@ vim.api.nvim_create_autocmd("User", {
   pattern = "NvimRecorderRecordEnd",
   callback = function (data)
     if started_recording --[[ and sess_is_open() ]] then
-      recording_to_save = data.data.recording
+      vim.ui.input({ prompt = "Test name" }, function(name)
+        if name then
+          local get_session_file = require"resession.util".get_session_file
+          local saved_file = get_session_file(nvt_conf.saved_sessname, sessiondir)
+          local new_file = get_session_file(name, sessiondir) -- name the session after the test
+          print("renaming session:", saved_file, new_file)
+          vim.loop.fs_rename(saved_file, new_file)
+
+          set_curr_test(name)
+          set_test_data(curr_test, {sess = name, recording = vim.fn.keytrans(data.data.recording)})
+        end
+      end)
     end
     started_recording = false
   end
@@ -263,8 +263,8 @@ local function _new_nvim_task(test)
   local overseer = require("overseer")
   if not test then test = curr_test or nvt_conf.temp_sessname end
 
-  set_curr_test(test)
   print("loading test:", test)
+  set_curr_test(test)
 
   if not templates_registered then
     for name, template in pairs(templates) do
@@ -275,7 +275,7 @@ local function _new_nvim_task(test)
     templates_registered = true
   end
 
-  overseer.run_template({name = "nvim", params = {sess = test, dir = get_sessiondir()}}, task_cb)
+  overseer.run_template({name = "nvim", params = {sess = test}}, task_cb)
 end
 
 local function new_nvim_task(sess)
@@ -339,10 +339,12 @@ function M.save_restart()
 end
 
 function M.blank_sess()
-  nvt_conf.write_data(state_file, {abort_temp_save = true})
+  if curr_task then
+    run_child("require'nvim-task.config'.abort_temp_save()")
+  end
 
-  if nvt_conf.session_exists(nvt_conf.temp_sessname, get_sessiondir()) then
-    require"resession".delete(nvt_conf.temp_sessname, { dir = get_sessiondir() })
+  if nvt_conf.session_exists(nvt_conf.temp_sessname, sessiondir) then
+    require"resession".delete(nvt_conf.temp_sessname, { dir = sessiondir })
     del_test_data(nvt_conf.temp_sessname)
   end
 
@@ -353,7 +355,7 @@ vim.keymap.set("n", "<leader>W", function () M.save_restart() end)
 vim.keymap.set("n", test_mappings.restart_session, function () M.restart() end)
 vim.keymap.set("n", test_mappings.exit_session, function () M.abort_curr_task() end)
 vim.keymap.set("n", "<leader>fx", function () M.sess_picker():find() end)
-vim.keymap.set("n", "<leader>xb", function () M.blank_sess() end)
+vim.keymap.set("n", test_mappings.blank_session, function () M.blank_sess() end)
 
 return M
 
