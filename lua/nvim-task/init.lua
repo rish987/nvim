@@ -40,10 +40,11 @@ local nvt_conf = require "nvim-task.config"
 -- local config_file = script_path() .. get_path_separator() .. "config.lua"
 --
 
-local curr_test
+local metadata_key = "__NvimTaskData"
+
 local data_file = root_dir .. "/nvim-task.json"
-local tests_data = vim.fn.filereadable(data_file) ~= 0 and vim.fn.json_decode(vim.fn.readfile(data_file)) or {}
--- TODO save/load from file
+local tests_data = vim.fn.filereadable(data_file) ~= 0 and vim.fn.json_decode(vim.fn.readfile(data_file)) or {[metadata_key] = {}}
+local curr_test = tests_data[metadata_key].curr_test
 
 local function set_test_data(test, value)
   local curr_data = tests_data[test] or {}
@@ -55,12 +56,25 @@ local function set_test_data(test, value)
   vim.fn.writefile({json}, data_file)
 end
 
+local function set_test_metadata(value)
+  set_test_data(metadata_key, value)
+end
+
 local function del_test_data(test)
   tests_data[test] = nil
 
   local json = vim.fn.json_encode(tests_data)
   vim.fn.writefile({json}, data_file)
 end
+
+local socket_i = 0
+local child_sock = "/tmp/nvimtasksocketchild" .. socket_i
+while vim.fn.filereadable(child_sock) ~= 0 do
+  socket_i = socket_i + 1
+  child_sock = "/tmp/nvimtasksocketchild" .. socket_i
+end
+
+local sock = vim.call("serverstart")
 
 local templates = {
   ["nvim"] = {
@@ -72,6 +86,8 @@ local templates = {
           "--cmd", ('let g:NvimTaskStateFile = "%s"'):format(state_file),
           "--cmd", ('let g:NvimTaskSessionDir = "%s"'):format(params.dir),
           "--cmd", ('let g:NvimTaskSession = "%s"'):format(params.sess),
+          "--cmd", ('let g:NvimTaskParentSock = "%s"'):format(sock),
+          "--listen", child_sock
         },
         strategy = "toggleterm",
         components = {
@@ -115,10 +131,16 @@ end
 
 local recording_to_save
 
+local function set_curr_test(test)
+  curr_test = test
+  set_test_metadata({curr_test = curr_test})
+end
+
 --- TODO make async
 M.abort_curr_task = function (cb)
   if curr_task then
     a.run(function()
+      -- vim.fn.chanclose(curr_task.sock)
       local was_open = test_is_open()
       curr_task:stop()
       curr_task:dispose()
@@ -136,7 +158,7 @@ M.abort_curr_task = function (cb)
       -- the old task may have saved a new session, if so update curr_session to use that one next time
       local reset_sess = nvt_conf.read_data(state_file).reset_sess
       if reset_sess then
-        curr_test = reset_sess -- name the test after whatever the session was named under
+        set_curr_test(reset_sess) -- name the test after whatever the session was named under
         set_test_data(curr_test, {sess = reset_sess, recording = recording_to_save})
       end
 
@@ -161,13 +183,13 @@ vim.api.nvim_create_autocmd("QuitPre", { -- makes sure that the last session sta
 --   vim.cmd.rshada({bang = true})
 --   print("reset sess value:", vim.g.NVIM_TASK_RESET_SESS)
 -- end)
-local sess_leader = vim.g.StartedByNvimTask and "<C-A-x>" or "<C-x>"
-local sess_mappings = {
+local test_leader = vim.g.StartedByNvimTask and "<C-A-x>" or "<C-x>"
+local test_mappings = {
   play_recording_shortcut = "<tab>",
-  restart_session = sess_leader .. "r",
-  exit_session = sess_leader .. "x",
-  duplicate_session = sess_leader .. "d",
-  delete_session = sess_leader .. "D",
+  restart_session = test_leader .. "r",
+  exit_session = test_leader .. "x",
+  duplicate_session = test_leader .. "d",
+  delete_session = test_leader .. "D",
 }
 
 local function maybe_play_recording()
@@ -176,7 +198,12 @@ local function maybe_play_recording()
     require"recorder".playRecording()
     return
   end
-  vim.fn.feedkeys(vim.api.nvim_replace_termcodes(sess_mappings.play_recording_shortcut, true, true, true), "n")
+  vim.fn.feedkeys(vim.api.nvim_replace_termcodes(test_mappings.play_recording_shortcut, true, true, true), "n")
+end
+
+function M.set_child_sock()
+  curr_task.sock = vim.fn.sockconnect("pipe", child_sock, {rpc = true})
+  print("child sock:", curr_task.sock)
 end
 
 -- TODO status line indicator for current recording and keymap to clear recording
@@ -184,10 +211,10 @@ end
 local function task_cb (task)
   curr_task = task
   local buf = task.strategy.term.buffer
-  vim.keymap.set("t", sess_mappings.play_recording_shortcut, maybe_play_recording, {buffer = buf})
-  vim.keymap.set("t", sess_mappings.exit_session, function () M.abort_curr_task() end, {buffer = buf})
-  vim.keymap.set("t", sess_mappings.restart_session, function () M.restart() end, {buffer = buf})
-  -- vim.keymap.set("n", sess_mappings.duplicate_session, function () vim.cmd"startinsert" end, {buffer = buf})
+  vim.keymap.set("t", test_mappings.play_recording_shortcut, maybe_play_recording, {buffer = buf})
+  vim.keymap.set("t", test_mappings.exit_session, function () M.abort_curr_task() end, {buffer = buf})
+  vim.keymap.set("t", test_mappings.restart_session, function () M.restart() end, {buffer = buf})
+  vim.keymap.set("t", test_mappings.duplicate_session, function () vim.fn.rpcrequest(task.sock, "nvim_exec_lua", "print('HERE')", {}) end, {buffer = buf})
 
   nvt_conf.erase_data(state_file, "abort_temp_save")
 end
@@ -236,7 +263,7 @@ local function _new_nvim_task(test)
   local overseer = require("overseer")
   if not test then test = curr_test or nvt_conf.temp_sessname end
 
-  curr_test = test
+  set_curr_test(test)
   print("loading test:", test)
 
   if not templates_registered then
@@ -323,9 +350,9 @@ function M.blank_sess()
 end
 
 vim.keymap.set("n", "<leader>W", function () M.save_restart() end)
-vim.keymap.set("n", "<leader>X", function () M.restart() end)
-vim.keymap.set("n", "<leader>xx", function () M.abort_curr_task() end)
-vim.keymap.set("n", "<leader>xf", function () M.sess_picker():find() end)
+vim.keymap.set("n", test_mappings.restart_session, function () M.restart() end)
+vim.keymap.set("n", test_mappings.exit_session, function () M.abort_curr_task() end)
+vim.keymap.set("n", "<leader>fx", function () M.sess_picker():find() end)
 vim.keymap.set("n", "<leader>xb", function () M.blank_sess() end)
 
 return M

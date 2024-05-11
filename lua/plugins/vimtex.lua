@@ -4,10 +4,10 @@ return {
     init = function ()
       vim.g.vimtex_compiler_latexmk = {
         ['options'] = {
+          -- '-xelatex',
           '-verbose',
           '-file-line-error',
           '-shell-escape',
-          '-xelatex',
           '-synctex=1',
           '-interaction=nonstopmode',
         },

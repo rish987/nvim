@@ -53,6 +53,9 @@ end
 
 if not vim.g.StartedByNvimTask then return M end
 
+local parent_sock = vim.fn.sockconnect("pipe", vim.g.NvimTaskParentSock, {rpc = true})
+vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'nvim-task'.set_child_sock()", {})
+
 vim.o.swapfile = false
 
 M.ns = vim.api.nvim_create_namespace("nvim-task")
@@ -76,7 +79,11 @@ vim.keymap.set("n", "<leader>S", function () -- save to default slot
 end)
 
 vim.keymap.set("n", "<leader>F", function () -- save a new session
-  require"resession".save(nil, { dir = sessiondir })
+  vim.ui.input({ prompt = "Session name" }, function(name)
+    if name then
+      require"resession".save(name, { dir = sessiondir })
+    end
+  end)
 end)
 
 vim.keymap.set("n", "<leader>A", function ()

@@ -63,7 +63,8 @@ return {
 		end,
     opts = {}
   },
-  -- {
-  --   "direnv/direnv.vim",
-  -- },
+  {
+    "sindrets/winshift.nvim",
+    config = true
+  },
 }
