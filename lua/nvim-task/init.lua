@@ -1,5 +1,6 @@
 local M = {}
 
+-- use a different session-saving directory for nested instances
 local dir = vim.g.StartedByNvimTask and "nvim-task-nested" or "nvim-task"
 local root_dir = vim.fn.stdpath("data") .. "/" .. dir
 vim.fn.mkdir(root_dir, "p")
@@ -79,8 +80,8 @@ local templates = {
         cmd = { "nvim" },
         args = {
           "--cmd", 'let g:StartedByNvimTask = "true"',
-          "--cmd", ('let g:NvimTaskSessionDir = "%s"'):format(sessiondir),
-          "--cmd", ('let g:NvimTaskSession = "%s"'):format(params.sess),
+          "--cmd", ('let g:NvimTaskSessionDir = "%s"'):format(sessiondir), -- use parent sessiondir
+          "--cmd", ('let g:NvimTaskTest = "%s"'):format(params.test),
           "--cmd", ('let g:NvimTaskParentSock = "%s"'):format(sock),
           "--listen", child_sock
         },
@@ -170,11 +171,12 @@ vim.api.nvim_create_autocmd("QuitPre", { -- makes sure that the last session sta
 local test_leader = vim.g.StartedByNvimTask and "<C-A-x>" or "<C-x>"
 local test_mappings = {
   play_recording_shortcut = "<tab>",
-  restart_session = test_leader .. "r",
-  exit_session = test_leader .. "x",
-  blank_session = test_leader .. "b",
-  duplicate_session = test_leader .. "d",
-  delete_session = test_leader .. "D",
+  restart_test = test_leader .. "r",
+  exit_test = test_leader .. "x",
+  blank_test = test_leader .. "b",
+  duplicate_test = test_leader .. "d",
+  delete_test = test_leader .. "D",
+  find_test = test_leader .. "f",
 }
 
 local function maybe_play_recording()
@@ -201,10 +203,10 @@ local function task_cb (task)
   curr_task = task
   local buf = task.strategy.term.buffer
   vim.keymap.set("t", test_mappings.play_recording_shortcut, maybe_play_recording, {buffer = buf})
-  vim.keymap.set("t", test_mappings.exit_session, function () M.abort_curr_task() end, {buffer = buf})
-  vim.keymap.set("t", test_mappings.restart_session, function () M.restart() end, {buffer = buf})
-  vim.keymap.set("t", test_mappings.blank_session, function () M.blank_sess() end, {buffer = buf})
-  vim.keymap.set("t", test_mappings.duplicate_session, function () run_child(print"HERE") end, {buffer = buf})
+  vim.keymap.set("t", test_mappings.exit_test, function () M.abort_curr_task() end, {buffer = buf})
+  vim.keymap.set("t", test_mappings.restart_test, function () M.restart() end, {buffer = buf})
+  vim.keymap.set("t", test_mappings.blank_test, function () M.blank_sess() end, {buffer = buf})
+  vim.keymap.set("t", test_mappings.duplicate_test, function () run_child(print"HERE") end, {buffer = buf})
 end
 
 -- recording started in terminal?
@@ -243,7 +245,7 @@ vim.api.nvim_create_autocmd("User", {
       vim.ui.input({ prompt = "Test name" }, function(name)
         if name then
           local get_session_file = require"resession.util".get_session_file
-          local saved_file = get_session_file(nvt_conf.saved_sessname, sessiondir)
+          local saved_file = get_session_file(nvt_conf.saved_test_name, sessiondir)
           local new_file = get_session_file(name, sessiondir) -- name the session after the test
           print("renaming session:", saved_file, new_file)
           vim.loop.fs_rename(saved_file, new_file)
@@ -261,7 +263,7 @@ local templates_registered = false
 
 local function _new_nvim_task(test)
   local overseer = require("overseer")
-  if not test then test = curr_test or nvt_conf.temp_sessname end
+  if not test then test = curr_test or nvt_conf.temp_test_name end
 
   print("loading test:", test)
   set_curr_test(test)
@@ -275,16 +277,16 @@ local function _new_nvim_task(test)
     templates_registered = true
   end
 
-  overseer.run_template({name = "nvim", params = {sess = test}}, task_cb)
+  overseer.run_template({name = "nvim", params = {test = test}}, task_cb)
 end
 
-local function new_nvim_task(sess)
-  if not M.abort_curr_task(function() _new_nvim_task(sess) end) then
-    _new_nvim_task(sess)
+local function new_nvim_task(test)
+  if not M.abort_curr_task(function() _new_nvim_task(test) end) then
+    _new_nvim_task(test)
   end
 end
 
-function M.sess_picker()
+function M.test_picker()
   local actions = require "telescope.actions"
   local action_state = require "telescope.actions.state"
   local finders = require "telescope.finders"
@@ -295,7 +297,7 @@ function M.sess_picker()
   local results = {}
 
   for test, _ in pairs(tests_data) do
-    if test ~= nvt_conf.temp_sessname then
+    if test ~= nvt_conf.temp_test_name and test ~= metadata_key then
       table.insert(results, test)
     end
   end
@@ -329,6 +331,11 @@ function M.sess_picker()
     })
 end
 
+function M.pick_test()
+  local picker = M.test_picker()
+  if picker then picker:find() end
+end
+
 function M.restart()
   new_nvim_task()
 end
@@ -343,24 +350,21 @@ function M.blank_sess()
     run_child("require'nvim-task.config'.abort_temp_save()")
   end
 
-  if nvt_conf.session_exists(nvt_conf.temp_sessname, sessiondir) then
-    require"resession".delete(nvt_conf.temp_sessname, { dir = sessiondir })
-    del_test_data(nvt_conf.temp_sessname)
+  if nvt_conf.session_exists(nvt_conf.temp_test_name, sessiondir) then
+    require"resession".delete(nvt_conf.temp_test_name, { dir = sessiondir })
+    del_test_data(nvt_conf.temp_test_name)
   end
 
-  new_nvim_task(nvt_conf.temp_sessname)
+  new_nvim_task(nvt_conf.temp_test_name)
 end
 
-vim.keymap.set("n", "<leader>W", function () M.save_restart() end)
-vim.keymap.set("n", test_mappings.restart_session, function () M.restart() end)
-vim.keymap.set("n", test_mappings.exit_session, function () M.abort_curr_task() end)
-vim.keymap.set("n", "<leader>fx", function () M.sess_picker():find() end)
-vim.keymap.set("n", test_mappings.blank_session, function () M.blank_sess() end)
+vim.keymap.set("n", "<leader>W", M.save_restart)
+vim.keymap.set("n", test_mappings.restart_test, M.restart)
+vim.keymap.set("n", test_mappings.exit_test, M.abort_curr_task)
+vim.keymap.set("n", test_mappings.find_test, M.pick_test)
+vim.keymap.set("n", test_mappings.blank_test, M.blank_sess)
 
 return M
-
--- TODO mapping to open telescope to select explicitly saved sessions (under cwd)
--- TODO mapping to clear saved session
 
 -- vim.keymap.set("n", "<leader>tc", function () run_template("check", {}) end)
 -- vim.keymap.set("n", "<leader>to", function () run_only(vim.fn.input("enter constant names (comma-separated, no whitespace): ")) end)

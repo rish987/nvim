@@ -1,7 +1,7 @@
 local M = {}
 
-M.saved_sessname = "NvimTask_saved"
-M.temp_sessname = "NvimTask_curr"
+M.saved_test_name = "NvimTask_saved"
+M.temp_test_name = "NvimTask_curr"
 
 local function file_exists(filename)
     local stat = vim.loop.fs_stat(filename)
@@ -74,40 +74,26 @@ end)
 
 local sessiondir = vim.g.NvimTaskSessionDir
 
+local test = vim.g.NvimTaskTest
+local named_test = false -- whether some particular test was loaded/saved (i.e. not using M.temp_test_name)
+
 function M.save_session () -- save to default slot
   -- FIXME do this without setting any "state" w.r.t the current session
-  require"resession".save(M.saved_sessname, { dir = sessiondir })
+  require"resession".save(M.saved_test_name, { dir = sessiondir })
+  named_test = true
 end
 
-vim.keymap.set("n", "<leader>S", M.save_session)
-
-vim.keymap.set("n", "<leader>F", function () -- save a new session
-  vim.ui.input({ prompt = "Session name" }, function(name)
-    if name then
-      require"resession".save(name, { dir = sessiondir })
-    end
-  end)
-end)
-
-vim.keymap.set("n", "<leader>A", function ()
-  require"resession".load(nil, { dir = sessiondir })
-end)
-
--- Gets the current session name, reading vim.g.NvimTaskSession if no session is loaded yet.
-local function get_session_name()
-  local curr_sessname = require"resession".get_current()
-  if curr_sessname then return curr_sessname end
-
-  return vim.g.NvimTaskSession
-end
+-- vim.keymap.set("n", "<leader>A", function ()
+--   require"resession".load(nil, { dir = sessiondir })
+-- end)
 
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = vim.schedule_wrap(function()
-    local sess = get_session_name()
-    if M.session_exists(sess, sessiondir) then
-      require"resession".load(sess, { dir = sessiondir, silence_errors = true })
-      M.msgview_enable()
+    if M.session_exists(test, sessiondir) then
+      if test ~= M.temp_test_name then named_test = true end
+      require"resession".load(test, { dir = sessiondir, silence_errors = true })
     end
+    M.msgview_enable()
   end),
 })
 
@@ -170,9 +156,8 @@ end
 
 vim.api.nvim_create_autocmd("VimLeavePre", {
   callback = function()
-    local sess = get_session_name()
-    if sess == M.temp_sessname and not abort_temp_save then -- auto-save temporary session
-      require"resession".save(sess, { dir = sessiondir, notify = false })
+    if not named_test and not abort_temp_save then -- auto-save temporary session
+      require"resession".save(test, { dir = sessiondir, notify = false })
     end
 
     update_task_data()
