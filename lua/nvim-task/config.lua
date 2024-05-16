@@ -164,5 +164,62 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
   end,
 })
 
+-- require("spider")
+-- vim.keymap.set(
+--   { "n", "o", "x" },
+--   "<C-A-w>",
+--   "<cmd>lua require('spider').motion('w', {})<CR>",
+--   { desc = "Spider-w" }
+-- )
+
+-- list of modules that are used in the function override,
+-- and must therefore be temporarily reset to the originals when used in the function
+-- in order to avoid inifinite looping
+-- local blacklist = { "_G", "vim.inspect", }
+
+-- local orig_bmods = {}
+-- for _, mod_name in ipairs(blacklist) do
+--   orig_bmods[mod_name] = require(mod_name)
+-- end
+--
+-- local _pairs = pairs
+
+-- TODO how to deal with lazy-loading?
+
+for mod_name, module in pairs(package.loaded) do
+  if type(module) == "table" then
+    local new_module = {}
+    -- TODO handle metatable (and __index field in particular)
+    for val_name, val in pairs(module) do
+      if type(val) == "function" then
+        new_module[val_name] = function (...)
+          local args_string = ""
+          local args = {...}
+          for i, a in ipairs(args) do
+            local a_str = vim.inspect(a) -- TODO make sure that this works if a is a string containing single/double quote characters
+            if i ~= #args then
+              args_string = args_string .. a_str .. ", "
+            else
+              args_string = args_string .. a_str
+            end
+          end
+          -- print(('require"%s".%s(%s)'):format(mod_name, val_name, args_string))
+
+          return val(...)
+        end
+      else
+        new_module[val_name] = val
+      end
+    end
+
+    setmetatable(new_module, getmetatable(module))
+
+    package.loaded[mod_name] = new_module
+  else
+    -- print(mod_name, type(module))
+  end
+
+  ::continue::
+end
 return M
 -- TODO incremental recordings scoped to session?
