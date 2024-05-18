@@ -75,12 +75,10 @@ end)
 local sessiondir = vim.g.NvimTaskSessionDir
 
 local test = vim.g.NvimTaskTest
-local named_test = false -- whether some particular test was loaded/saved (i.e. not using M.temp_test_name)
 
 function M.save_session () -- save to default slot
   -- FIXME do this without setting any "state" w.r.t the current session
   require"resession".save(M.saved_test_name, { dir = sessiondir })
-  named_test = true
 end
 
 -- vim.keymap.set("n", "<leader>A", function ()
@@ -90,8 +88,9 @@ end
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = vim.schedule_wrap(function()
     if M.session_exists(test, sessiondir) then
-      if test ~= M.temp_test_name then named_test = true end
       require"resession".load(test, { dir = sessiondir, silence_errors = true })
+    else
+      test = M.temp_test_name
     end
     M.msgview_enable()
   end),
@@ -156,7 +155,7 @@ end
 
 vim.api.nvim_create_autocmd("VimLeavePre", {
   callback = function()
-    if not named_test and not abort_temp_save then -- auto-save temporary session
+    if test == M.temp_test_name and not abort_temp_save then -- auto-save temporary session
       require"resession".save(test, { dir = sessiondir, notify = false })
     end
 
@@ -164,13 +163,13 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
   end,
 })
 
--- require("spider")
--- vim.keymap.set(
---   { "n", "o", "x" },
---   "<C-A-w>",
---   "<cmd>lua require('spider').motion('w', {})<CR>",
---   { desc = "Spider-w" }
--- )
+vim.keymap.set(
+  { "n", "o", "x" },
+  "<C-A-w>",
+  function ()
+    require('alternate').test()
+  end
+)
 
 -- list of modules that are used in the function override,
 -- and must therefore be temporarily reset to the originals when used in the function
@@ -185,14 +184,31 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
 -- local _pairs = pairs
 
 -- TODO how to deal with lazy-loading?
+--
+-- TODO why is vim.api not captured by this?
+
+local disable = false
+local module_metadata = {}
+
+local blacklist = {
+  -- ["_G"] = true,
+  -- ["vim.inspect"] = true,
+  -- ["vim.keymap"] = true,
+  -- ["table"] = true,
+  -- ["string"] = true,
+  -- ["debug"] = true,
+}
 
 for mod_name, module in pairs(package.loaded) do
+  -- if mod_name ~= "vgit" and mod_name ~= "lazy" then goto continue end
   if type(module) == "table" then
     local new_module = {}
     -- TODO handle metatable (and __index field in particular)
     for val_name, val in pairs(module) do
+      -- TODO need to do this also for functions nested in tables
       if type(val) == "function" then
         new_module[val_name] = function (...)
+          disable = true
           local args_string = ""
           local args = {...}
           for i, a in ipairs(args) do
@@ -203,23 +219,70 @@ for mod_name, module in pairs(package.loaded) do
               args_string = args_string .. a_str
             end
           end
-          -- print(('require"%s".%s(%s)'):format(mod_name, val_name, args_string))
+          local call_string = ('require"%s".%s(%s)'):format(mod_name, val_name, args_string)
+
+          local callstack = {call_string}
+          local parent_i = 2
+          while true do
+            local parent_info = debug.getinfo(parent_i)
+            if not parent_info then --[[ print(parent_i) ]] break end
+            if parent_info then
+              local func = parent_info.func
+              local i = 1
+              while true do
+                local n, v = debug.getupvalue(func, i)
+                if not n then break end
+                if mod_name == "alternate" and val_name == "_test" then
+                  -- TODO why doesn't this capture the upvalues I expect?
+                  print("var:", n)
+                end
+                if n == "callstack" then
+                  v = vim.deepcopy(v)
+                  vim.fn.extend(v, callstack)
+                  callstack = v
+                  break
+                end
+                i = i + 1
+              end
+            end
+            parent_i = parent_i + 1
+          end
+          if mod_name == "alternate" then
+            vim.print(callstack)
+          end
+          -- vim.print(callstack)
+          disable = false
 
           return val(...)
         end
-      else
-        new_module[val_name] = val
+      -- else
+      --   new_module[val_name] = val
       end
     end
 
-    setmetatable(new_module, getmetatable(module))
+    for val_name, new_val in pairs(new_module) do
+      local orig_val = module[val_name]
+      module[val_name] = function (...)
+        if disable then
+          return orig_val(...)
+        else
+          return new_val(...)
+        end
+      end
+    end
 
-    package.loaded[mod_name] = new_module
+    -- setmetatable(new_module, getmetatable(module))
+    --
+    -- -- if mod_name == "alternate" then
+    -- --   print("replacing", module, "with", new_module)
+    -- -- end
+    -- package.loaded[mod_name] = new_module
   else
     -- print(mod_name, type(module))
   end
 
   ::continue::
 end
+
 return M
 -- TODO incremental recordings scoped to session?

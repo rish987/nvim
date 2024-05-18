@@ -190,7 +190,7 @@ end
 
 function M.set_child_sock()
   curr_task.sock = vim.fn.sockconnect("pipe", child_sock, {rpc = true})
-  print("child sock:", curr_task.sock)
+  -- print("child sock:", curr_task.sock)
 end
 
 -- TODO status line indicator for current recording and keymap to clear recording
@@ -201,7 +201,7 @@ end
 
 local function task_cb (task)
   curr_task = task
-  local buf = task.strategy.term.buffer
+  local buf = task.strategy.term.bufnr
   vim.keymap.set("t", test_mappings.play_recording_shortcut, maybe_play_recording, {buffer = buf})
   vim.keymap.set("t", test_mappings.exit_test, function () M.abort_curr_task() end, {buffer = buf})
   vim.keymap.set("t", test_mappings.restart_test, function () M.restart() end, {buffer = buf})

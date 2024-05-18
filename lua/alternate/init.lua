@@ -109,6 +109,16 @@ function M.alt_scroll(direction, speed)
   end
 end
 
+function M._test()
+  vim.print(M.curr_altwin())
+end
+
+function M.test()
+  local var = 5
+  M._test()
+  return var
+end
+
 vim.keymap.set("n", "<C-w><C-w>", M.alt_goto)
 
 vim.keymap.set("n", "<C-A-j>", M.alt_scroll(1))
