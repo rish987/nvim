@@ -165,7 +165,7 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
 
 vim.keymap.set(
   { "n", "o", "x" },
-  "<C-A-w>",
+  "<C-p>",
   function ()
     require('alternate').test()
   end
@@ -198,9 +198,45 @@ local blacklist = {
   -- ["string"] = true,
   -- ["debug"] = true,
 }
+local function test2()
+  local test2_var
+  local parent_i = 0
+  while true do
+    local i = 1
+    if not debug.getinfo(parent_i) then break end
+    while true do
+      local n, v = debug.getlocal(parent_i, i)
+      if not n then break end
+      print("var(", parent_i, "):", n)
+      i = i + 1
+    end
+    parent_i = parent_i + 1
+  end
+end
+
+
+local function test()
+  local test_var
+  (function ()
+    local test1_var
+    test2()
+  end)()
+end
+
+-- vim.keymap.set(
+--   { "n", "o", "x" },
+--   "<C-p>",
+--   function ()
+--     test()
+--   end
+-- )
+
+-- if true then return M end
+
+local _unpack = unpack
 
 for mod_name, module in pairs(package.loaded) do
-  -- if mod_name ~= "vgit" and mod_name ~= "lazy" then goto continue end
+  if mod_name ~= "alternate" then goto continue end
   if type(module) == "table" then
     local new_module = {}
     -- TODO handle metatable (and __index field in particular)
@@ -209,51 +245,54 @@ for mod_name, module in pairs(package.loaded) do
       if type(val) == "function" then
         new_module[val_name] = function (...)
           disable = true
-          local args_string = ""
           local args = {...}
-          for i, a in ipairs(args) do
-            local a_str = vim.inspect(a) -- TODO make sure that this works if a is a string containing single/double quote characters
-            if i ~= #args then
-              args_string = args_string .. a_str .. ", "
-            else
-              args_string = args_string .. a_str
-            end
-          end
-          local call_string = ('require"%s".%s(%s)'):format(mod_name, val_name, args_string)
+          -- for i, a in ipairs(args) do
+          --   local a_str = vim.inspect(a) -- TODO make sure that this works if a is a string containing single/double quote characters
+          --   if i ~= #args then
+          --     args_string = args_string .. a_str .. ", "
+          --   else
+          --     args_string = args_string .. a_str
+          --   end
+          -- end
+          -- local call_string = ('require"%s".%s(%s)'):format(mod_name, val_name, args_string)
 
-          local callstack = {call_string}
+          local call_obj = {module = mod_name, func = val_name, args = args, called = {}}
+
           local parent_i = 2
+          local has_parent = false
           while true do
-            local parent_info = debug.getinfo(parent_i)
-            if not parent_info then --[[ print(parent_i) ]] break end
-            if parent_info then
-              local func = parent_info.func
-              local i = 1
-              while true do
-                local n, v = debug.getupvalue(func, i)
-                if not n then break end
-                if mod_name == "alternate" and val_name == "_test" then
-                  -- TODO why doesn't this capture the upvalues I expect?
-                  print("var:", n)
-                end
-                if n == "callstack" then
-                  v = vim.deepcopy(v)
-                  vim.fn.extend(v, callstack)
-                  callstack = v
-                  break
-                end
-                i = i + 1
+            local i = 1
+            if not debug.getinfo(parent_i) then break end
+            while true do
+              local n, v = debug.getlocal(parent_i, i)
+              if not n then break end
+              -- if mod_name == "alternate" then
+              --   -- TODO why doesn't this capture the upvalues I expect?
+              --   print("var(", parent_i, "," .. val_name .. "):", n)
+              -- end
+              if n == "call_obj" then
+                has_parent = true
+                table.insert(v.called, call_obj)
+                break
               end
+              i = i + 1
             end
             parent_i = parent_i + 1
           end
-          if mod_name == "alternate" then
-            vim.print(callstack)
-          end
-          -- vim.print(callstack)
+
           disable = false
 
-          return val(...)
+          -- return val(...) -- FIXME for some reason we lose access to the full stack doing this
+          local et = {val(...)}
+
+          disable = true
+
+          if not has_parent then
+            -- print(has_parent, vim.inspect(call_obj))
+          end
+          disable = false
+
+          return _unpack(et)
         end
       -- else
       --   new_module[val_name] = val
