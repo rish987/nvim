@@ -234,9 +234,11 @@ end
 -- if true then return M end
 
 local _unpack = unpack
+local _select = select
+local _pack = function(...) return { n = _select("#", ...), ... } end
 
 for mod_name, module in pairs(package.loaded) do
-  if mod_name ~= "alternate" then goto continue end
+  -- if mod_name ~= "alternate" then goto continue end
   if type(module) == "table" then
     local new_module = {}
     -- TODO handle metatable (and __index field in particular)
@@ -282,8 +284,9 @@ for mod_name, module in pairs(package.loaded) do
 
           disable = false
 
-          -- return val(...) -- FIXME for some reason we lose access to the full stack doing this
-          local et = {val(...)}
+          -- if true then return val(...) end -- FIXME for some reason we lose access to the full stack doing this
+
+          local ret = _pack(val(...))
 
           disable = true
 
@@ -292,7 +295,7 @@ for mod_name, module in pairs(package.loaded) do
           end
           disable = false
 
-          return _unpack(et)
+          return _unpack(ret, 1, ret.n)
         end
       -- else
       --   new_module[val_name] = val
