@@ -237,81 +237,80 @@ local _unpack = unpack
 local _select = select
 local _pack = function(...) return { n = _select("#", ...), ... } end
 
-for mod_name, module in pairs(package.loaded) do
-  -- if mod_name ~= "alternate" then goto continue end
-  if type(module) == "table" then
-    local new_module = {}
-    -- TODO handle metatable (and __index field in particular)
-    for val_name, val in pairs(module) do
-      -- TODO need to do this also for functions nested in tables
-      if type(val) == "function" then
-        new_module[val_name] = function (...)
-          disable = true
-          local args = {...}
-          -- for i, a in ipairs(args) do
-          --   local a_str = vim.inspect(a) -- TODO make sure that this works if a is a string containing single/double quote characters
-          --   if i ~= #args then
-          --     args_string = args_string .. a_str .. ", "
-          --   else
-          --     args_string = args_string .. a_str
-          --   end
-          -- end
-          -- local call_string = ('require"%s".%s(%s)'):format(mod_name, val_name, args_string)
+local submodstring = function(modname, submodnames)
+  return modname .. "." .. vim.fn.join(submodnames, ".")
+end
 
-          local call_obj = {module = mod_name, func = val_name, args = args, called = {}}
+local wrapped_mods = {}
+local function trace_wrap(modname, submodnames, mod)
+  wrapped_mods[mod] = true
+  for val_name, val in pairs(mod) do
+    if type(val) == "function" then
+      local wrapped = function (...)
+        disable = true
+        local args = {...}
+        -- for i, a in ipairs(args) do
+        --   local a_str = vim.inspect(a) -- TODO make sure that this works if a is a string containing single/double quote characters
+        --   if i ~= #args then
+        --     args_string = args_string .. a_str .. ", "
+        --   else
+        --     args_string = args_string .. a_str
+        --   end
+        -- end
+        -- local call_string = ('require"%s".%s(%s)'):format(mod_name, val_name, args_string)
 
-          local parent_i = 2
-          local has_parent = false
-          while true do
-            local i = 1
-            if not debug.getinfo(parent_i) then break end
-            while true do
-              local n, v = debug.getlocal(parent_i, i)
-              if not n then break end
-              -- if mod_name == "alternate" then
-              --   -- TODO why doesn't this capture the upvalues I expect?
-              --   print("var(", parent_i, "," .. val_name .. "):", n)
-              -- end
-              if n == "call_obj" then
-                has_parent = true
-                table.insert(v.called, call_obj)
-                break
-              end
-              i = i + 1
-            end
-            parent_i = parent_i + 1
+        local call_obj = {module = modname, submodules = submodnames, func = val_name, args = args, called = {}}
+
+        local parent_i = 2
+        local has_parent = false
+        while true do
+          if not debug.getinfo(parent_i) then break end
+          local n, v = debug.getlocal(parent_i, 2)
+          if n and n == "call_obj" then
+            has_parent = true
+            table.insert(v.called, call_obj)
           end
-
-          disable = false
-
-          -- if true then return val(...) end -- FIXME for some reason we lose access to the full stack doing this
-
-          local ret = _pack(val(...))
-
-          disable = true
-
-          if not has_parent then
-            -- print(has_parent, vim.inspect(call_obj))
-          end
-          disable = false
-
-          return _unpack(ret, 1, ret.n)
+          parent_i = parent_i + 1
         end
-      -- else
-      --   new_module[val_name] = val
-      end
-    end
 
-    for val_name, new_val in pairs(new_module) do
-      local orig_val = module[val_name]
-      module[val_name] = function (...)
+        disable = false
+
+        -- if true then return val(...) end -- FIXME for some reason we lose access to the full stack doing this
+
+        local ret = _pack(val(...))
+
+        disable = true
+
+        if not has_parent and modname == "alternate" and val_name == "test" then
+          print(vim.inspect(call_obj))
+        end
+
+        disable = false
+
+        return _unpack(ret, 1, ret.n)
+      end
+      mod[val_name] = function (...)
         if disable then
-          return orig_val(...)
+          return val(...)
         else
-          return new_val(...)
+          return wrapped(...)
         end
       end
+    elseif type(val) == "table" and not wrapped_mods[val] then
+      local new_submodnames = vim.deepcopy(submodnames)
+      table.insert(new_submodnames, val_name)
+      trace_wrap(modname, new_submodnames, val)
     end
+  end
+end
+
+disable = true
+for modname, module in pairs(package.loaded) do
+  -- if mod_name ~= "alternate" then goto continue end
+  if type(module) == "table" and modname ~= "package" then
+    -- TODO handle metatable (and __index field in particular)
+
+    trace_wrap(modname, {}, module)
 
     -- setmetatable(new_module, getmetatable(module))
     --
@@ -325,6 +324,7 @@ for mod_name, module in pairs(package.loaded) do
 
   ::continue::
 end
+disable = false
 
 return M
 -- TODO incremental recordings scoped to session?

@@ -111,7 +111,8 @@ end
 
 function M._test()
   local _testvar = 5
-  vim.print(M.curr_altwin())
+  vim.api.nvim_list_wins()
+  -- vim.print(M.curr_altwin())
 end
 
 function M.test()
