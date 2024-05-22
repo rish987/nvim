@@ -196,7 +196,7 @@ end
 -- TODO status line indicator for current recording and keymap to clear recording
 local function run_child(code, args)
   args = args or {}
-  vim.fn.rpcrequest(curr_task.sock, "nvim_exec_lua", code, args)
+  return vim.fn.rpcrequest(curr_task.sock, "nvim_exec_lua", code, args)
 end
 
 local function task_cb (task)
@@ -206,7 +206,7 @@ local function task_cb (task)
   vim.keymap.set("t", test_mappings.exit_test, function () M.abort_curr_task() end, {buffer = buf})
   vim.keymap.set("t", test_mappings.restart_test, function () M.restart() end, {buffer = buf})
   vim.keymap.set("t", test_mappings.blank_test, function () M.blank_sess() end, {buffer = buf})
-  vim.keymap.set("t", test_mappings.duplicate_test, function () run_child(print"HERE") end, {buffer = buf})
+  -- vim.keymap.set("t", test_mappings.duplicate_test, function () run_child(print"HERE") end, {buffer = buf})
 end
 
 -- recording started in terminal?
@@ -234,6 +234,7 @@ vim.api.nvim_create_autocmd("User", {
       started_recording = true
       require"recorder".setRegOverride(reg_override)
       run_child("require'nvim-task.config'.save_session()")
+      run_child("require'nvim-task.config'.enable_calltrace()")
     end
   end
 })
@@ -242,6 +243,7 @@ vim.api.nvim_create_autocmd("User", {
   pattern = "NvimRecorderRecordEnd",
   callback = function (data)
     if started_recording --[[ and sess_is_open() ]] then
+      run_child("require'nvim-task.config'.disable_calltrace()")
       vim.ui.input({ prompt = "Test name" }, function(name)
         if name then
           local get_session_file = require"resession.util".get_session_file
@@ -249,6 +251,7 @@ vim.api.nvim_create_autocmd("User", {
           local new_file = get_session_file(name, sessiondir) -- name the session after the test
           print("renaming session:", saved_file, new_file)
           vim.loop.fs_rename(saved_file, new_file)
+          vim.print(run_child(("require'nvim-task.config'.record_finish(%s)"):format(name)))
 
           set_curr_test(name)
           set_test_data(curr_test, {sess = name, recording = vim.fn.keytrans(data.data.recording)})

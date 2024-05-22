@@ -79,6 +79,7 @@ local test = vim.g.NvimTaskTest
 function M.save_session () -- save to default slot
   -- FIXME do this without setting any "state" w.r.t the current session
   require"resession".save(M.saved_test_name, { dir = sessiondir })
+  test = nil
 end
 
 -- vim.keymap.set("n", "<leader>A", function ()
@@ -96,15 +97,6 @@ vim.api.nvim_create_autocmd("VimEnter", {
   end),
 })
 
-local set_map = {}
-
-local keymap_str = ':lua require"nvim-task.config".set_keymap("%s", "<c-x>", [[  ]])' .. vim.api.nvim_replace_termcodes("<C-f>bh", true, true, true)
-
-function M.set_keymap(mode, map, str)
-  vim.keymap.set(mode, "<c-x>", loadstring(str))
-  set_map[mode] = str
-end
-
 -- vim.keymap.set("n", "<leader>Xn", function ()
 --   vim.fn.feedkeys(keymap_str:format("n"))
 -- end)
@@ -114,38 +106,6 @@ end
 -- end)
 
 -- resession-generic
-local function _modify_data(name, opts, modify_fn)
-  if not name then
-    -- If no name, default to the current session
-    name = require"resession".get_current()
-  end
-  opts = opts or {}
-  local files = require"resession.files"
-  local util = require"resession.util"
-  local filename = util.get_session_file(name, opts.dir)
-  local data = modify_fn(files.load_json_file(filename))
-  files.write_json_file(filename, data)
-end
-
-local function modify_data(new_task_data)
-  _modify_data(nil, {dir = sessiondir},
-    function (data)
-      local task_data = data["nvim-task"] or {}
-      task_data = vim.tbl_extend("keep", new_task_data, task_data)
-      data["nvim-task"] = task_data
-      return data
-    end)
-end
-
-local function update_task_data()
-  local task_data = {}
-  if next(set_map) then
-    task_data.map = set_map
-  end
-  if next(task_data) then
-    modify_data(task_data)
-  end
-end
 
 local abort_temp_save = false
 
@@ -158,8 +118,6 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
     if test == M.temp_test_name and not abort_temp_save then -- auto-save temporary session
       require"resession".save(test, { dir = sessiondir, notify = false })
     end
-
-    update_task_data()
   end,
 })
 
@@ -187,41 +145,32 @@ vim.keymap.set(
 --
 -- TODO why is vim.api not captured by this?
 
-local disable = false
-local module_metadata = {}
+local disable = true
+local call_objs = {}
 
-local blacklist = {
-  -- ["_G"] = true,
-  -- ["vim.inspect"] = true,
+function M.enable_calltrace()
+  disable = false
+end
+
+function M.disable_calltrace()
+  disable = true
+end
+
+function M.record_finish(testname)
+  test = testname
+  -- TODO write JSON-serialized call_objs to file corresponding to testname
+  local curr_objs = call_objs
+  call_objs = {}
+  return curr_objs
+end
+
+local whitelist = {
+  ["overseer"] = true,
   -- ["vim.keymap"] = true,
   -- ["table"] = true,
   -- ["string"] = true,
   -- ["debug"] = true,
 }
-local function test2()
-  local test2_var
-  local parent_i = 0
-  while true do
-    local i = 1
-    if not debug.getinfo(parent_i) then break end
-    while true do
-      local n, v = debug.getlocal(parent_i, i)
-      if not n then break end
-      print("var(", parent_i, "):", n)
-      i = i + 1
-    end
-    parent_i = parent_i + 1
-  end
-end
-
-
-local function test()
-  local test_var
-  (function ()
-    local test1_var
-    test2()
-  end)()
-end
 
 -- vim.keymap.set(
 --   { "n", "o", "x" },
@@ -281,8 +230,8 @@ local function trace_wrap(modname, submodnames, mod)
 
         disable = true
 
-        if not has_parent and modname == "alternate" and val_name == "test" then
-          print(vim.inspect(call_obj))
+        if not has_parent then
+          print(table.insert(call_objs, call_obj))
         end
 
         disable = false
@@ -306,7 +255,8 @@ end
 
 disable = true
 for modname, module in pairs(package.loaded) do
-  -- if mod_name ~= "alternate" then goto continue end
+  if not whitelist[modname] then goto continue end
+
   if type(module) == "table" and modname ~= "package" then
     -- TODO handle metatable (and __index field in particular)
 
