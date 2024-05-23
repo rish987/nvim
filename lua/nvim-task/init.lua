@@ -35,7 +35,6 @@ local nvt_conf = require "nvim-task.config"
 -- end
 --
 -- local config_file = script_path() .. get_path_separator() .. "config.lua"
---
 
 local metadata_key = "__NvimTaskData"
 
@@ -251,7 +250,7 @@ vim.api.nvim_create_autocmd("User", {
           local new_file = get_session_file(name, sessiondir) -- name the session after the test
           print("renaming session:", saved_file, new_file)
           vim.loop.fs_rename(saved_file, new_file)
-          vim.print(run_child(("require'nvim-task.config'.record_finish(%s)"):format(name)))
+          vim.print(run_child(("return require'nvim-task.config'.record_finish(%s)"):format(name)))
 
           set_curr_test(name)
           set_test_data(curr_test, {sess = name, recording = vim.fn.keytrans(data.data.recording)})

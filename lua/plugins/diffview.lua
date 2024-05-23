@@ -36,6 +36,11 @@ return {
           winbar_info = false,          -- See |diffview-config-view.x.winbar_info|
         },
       },
+      hooks = {
+        diff_buf_win_enter = function()
+          vim.opt_local.foldenable = false
+        end,
+      },
     }
   }
 }

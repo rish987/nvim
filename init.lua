@@ -50,8 +50,6 @@ vim.opt.rtp:prepend(lazypath)
 
 require("rooter")
 
-require("alternate")
-
 require("lazy").setup("plugins",
   {
     dev = {
@@ -76,6 +74,8 @@ require("lazy").setup("plugins",
       notify = false, -- get a notification when changes are found
     },
   })
+
+require("alternate")
 
 vim.api.nvim_create_autocmd("WinClosed", {
   nested = true,
