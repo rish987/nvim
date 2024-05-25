@@ -6,6 +6,8 @@ local root_dir = vim.fn.stdpath("data") .. "/" .. dir
 vim.fn.mkdir(root_dir, "p")
 
 local sessiondir = dir .. "/sessions"
+local testdir = root_dir .. "/tests"
+vim.fn.mkdir(testdir, "p")
 
 local nvt_conf = require "nvim-task.config"
 
@@ -80,7 +82,7 @@ local templates = {
         args = {
           "--cmd", 'let g:StartedByNvimTask = "true"',
           "--cmd", ('let g:NvimTaskSessionDir = "%s"'):format(sessiondir), -- use parent sessiondir
-          "--cmd", ('let g:NvimTaskTest = "%s"'):format(params.test),
+          "--cmd", ('let g:NvimTaskSess = "%s"'):format(params.sess),
           "--cmd", ('let g:NvimTaskParentSock = "%s"'):format(sock),
           "--listen", child_sock
         },
@@ -129,6 +131,9 @@ local function set_curr_test(test)
   set_test_metadata({curr_test = curr_test})
 end
 
+local finished_playback = false
+local finished_playback_restart = false
+
 --- TODO make async
 M.abort_curr_task = function (cb)
   if curr_task then
@@ -139,6 +144,8 @@ M.abort_curr_task = function (cb)
       curr_task:dispose()
       local term = curr_task.strategy.term
       curr_task = nil
+      finished_playback = false
+      finished_playback_restart = false
 
       print"task aborted"
 
@@ -179,9 +186,18 @@ local test_mappings = {
 }
 
 local function maybe_play_recording()
+  if finished_playback_restart then
+    M.restart()
+    return
+  end
+  if finished_playback then
+    print(("playback finished, restart test or press '%s' again to replay"):format(test_mappings.play_recording_shortcut))
+    finished_playback_restart = true
+    return
+  end
   local sess_data = curr_test_data()
   if sess_data and vim.fn.reg_recording() == "" and sess_data.recording then
-    require"recorder".playRecording()
+    finished_playback = require"recorder".playRecording()
     return
   end
   vim.fn.feedkeys(vim.api.nvim_replace_termcodes(test_mappings.play_recording_shortcut, true, true, true), "n")
@@ -238,6 +254,93 @@ vim.api.nvim_create_autocmd("User", {
   end
 })
 
+local sessionload_fmt = [[resession.load(%s, { dir = %s })]] -- session name, directory
+local spyon_fmt = [[spy.on(%s, "%s")]] -- table, entry
+local spyassert_fmt = [[    assert.spy(%s).was_called_with(%s)]] -- function name, arg list
+local feedkeys_fmt = [[    vim.fn.feedkeys(vim.api.nvim_replace_termcodes("%s", true, true, true))]] -- keys from recording
+
+local testfile_fmt = [[
+local spy = require('luassert.spy')
+local resession = require"resession"
+
+-- load session
+%s
+
+-- set all spies
+%s
+
+describe("auto-generated test", function()
+  it("'%s'", function()
+    -- feed keys from recording
+%s
+
+    -- test that spies were called
+%s
+  end)
+end)
+]]
+
+local function get_funcpath(obj)
+  local modulestr = ([[require"%s"]]):format(obj.module)
+  local modulepath = #obj.submodules > 0 and modulestr .. "." .. vim.fn.join(obj.submodules, ".") or modulestr
+  return modulepath .. "." .. obj.func, modulepath
+end
+
+local function generate_spyons(calltrace, generated)
+  for _, obj in ipairs(calltrace) do
+    local funcpath, modulepath = get_funcpath(obj)
+    if not generated[funcpath] then
+      generated[funcpath] = spyon_fmt:format(modulepath, obj.func)
+    end
+    generate_spyons(obj.called, generated)
+  end
+  return generated
+end
+
+local function generate_spyasserts(calltrace, generated)
+  for _, obj in ipairs(calltrace) do
+    local funcpath = get_funcpath(obj)
+    local args_string = ""
+    for i, arg in ipairs(obj.args) do
+      local a_str = vim.inspect(arg) -- TODO make sure that this works if a is a string containing single/double quote characters
+      if i ~= #obj.args then
+        args_string = args_string .. a_str .. ", "
+      else
+        args_string = args_string .. a_str
+      end
+    end
+    table.insert(generated, spyassert_fmt:format(funcpath, args_string))
+    generate_spyasserts(obj.called, generated)
+  end
+  return generated
+end
+
+local function make_test(test)
+  local data = tests_data[test]
+  local calltrace = data.calltrace
+
+  local sessionload_str = sessionload_fmt:format(data.sess, sessiondir)
+  local spyon_strs = {}
+  for _, str in pairs(generate_spyons(calltrace, {})) do
+    table.insert(spyon_strs, str)
+  end
+  local spyon_str = vim.fn.join(spyon_strs, "\n")
+  
+  local spyassert_strs = {}
+  for _, str in pairs(generate_spyasserts(calltrace, {})) do
+    table.insert(spyassert_strs, str)
+  end
+  local spyassert_str = vim.fn.join(spyassert_strs, "\n")
+
+  local feedkeys_str = feedkeys_fmt:format(data.recording)
+
+  local test_str = testfile_fmt:format(sessionload_str, spyon_str, test, feedkeys_str, spyassert_str)
+
+  local test_filepath = testdir .. ("/%s_spec.lua"):format(test)
+  vim.fn.writefile(vim.fn.split(test_str, "\n"), test_filepath)
+  print("wrote", test_filepath)
+end
+
 vim.api.nvim_create_autocmd("User", {
   pattern = "NvimRecorderRecordEnd",
   callback = function (data)
@@ -248,12 +351,15 @@ vim.api.nvim_create_autocmd("User", {
           local get_session_file = require"resession.util".get_session_file
           local saved_file = get_session_file(nvt_conf.saved_test_name, sessiondir)
           local new_file = get_session_file(name, sessiondir) -- name the session after the test
+          -- TODO check and confirm override if session already exists
           print("renaming session:", saved_file, new_file)
           vim.loop.fs_rename(saved_file, new_file)
-          vim.print(run_child(("return require'nvim-task.config'.record_finish(%s)"):format(name)))
+          local calltrace_data = run_child(("return require'nvim-task.config'.record_finish(%s)"):format(name))
 
           set_curr_test(name)
-          set_test_data(curr_test, {sess = name, recording = vim.fn.keytrans(data.data.recording)})
+          set_test_data(curr_test, {sess = name, recording = vim.fn.keytrans(data.data.recording), calltrace = calltrace_data})
+
+          make_test(name)
         end
       end)
     end
@@ -266,6 +372,7 @@ local templates_registered = false
 local function _new_nvim_task(test)
   local overseer = require("overseer")
   if not test then test = curr_test or nvt_conf.temp_test_name end
+  local data = test == nvt_conf.temp_test_name and {sess = nvt_conf.temp_test_name} or tests_data[test]
 
   print("loading test:", test)
   set_curr_test(test)
@@ -279,7 +386,7 @@ local function _new_nvim_task(test)
     templates_registered = true
   end
 
-  overseer.run_template({name = "nvim", params = {test = test}}, task_cb)
+  overseer.run_template({name = "nvim", params = {sess = data.sess}}, task_cb)
 end
 
 local function new_nvim_task(test)
