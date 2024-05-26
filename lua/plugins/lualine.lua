@@ -49,10 +49,10 @@ return {
                 return "ALT"
               end,
               cond = function ()
-                -- require"vim.lsp.log".error(vim.inspect(require"alternate".curr_altwin()) .. ", " .. vim.api.nvim_get_current_win())
-                -- if require"alternate".curr_altwin() == vim.api.nvim_get_current_win() then
-                --   return true
-                -- end
+                require"vim.lsp.log".error(vim.inspect(require"alternate".curr_altwin()) .. ", " .. vim.api.nvim_get_current_win())
+                if require"alternate".curr_altwin() == vim.api.nvim_get_current_win() then
+                  return true
+                end
                 return false
               end,
               color = { fg = "#000000", bg = "#fc51ed" },

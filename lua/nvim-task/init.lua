@@ -249,7 +249,7 @@ vim.api.nvim_create_autocmd("User", {
       started_recording = true
       require"recorder".setRegOverride(reg_override)
       run_child("require'nvim-task.config'.save_session()")
-      run_child("require'nvim-task.config'.enable_calltrace()")
+      -- run_child("require'nvim-task.config'.enable_calltrace()")
     end
   end
 })
@@ -297,7 +297,7 @@ local function generate_spyons(calltrace, generated)
   return generated
 end
 
-local function generate_spyasserts(calltrace, generated)
+local function generate_spyasserts(calltrace, generated, depth)
   for _, obj in ipairs(calltrace) do
     local funcpath = get_funcpath(obj)
     local args_string = ""
@@ -310,14 +310,17 @@ local function generate_spyasserts(calltrace, generated)
       end
     end
     table.insert(generated, spyassert_fmt:format(funcpath, args_string))
-    generate_spyasserts(obj.called, generated)
+    if depth == 0 then
+      table.insert(generated, "") -- insert newline between top-level calls
+    end
+    generate_spyasserts(obj.called, generated, depth + 1)
   end
   return generated
 end
 
 local function make_test(test)
   local data = tests_data[test]
-  local calltrace = data.calltrace
+  local calltrace = nvt_conf.unpatch(data.calltrace)
 
   local sessionload_str = sessionload_fmt:format(data.sess, sessiondir)
   local spyon_strs = {}
@@ -325,9 +328,9 @@ local function make_test(test)
     table.insert(spyon_strs, str)
   end
   local spyon_str = vim.fn.join(spyon_strs, "\n")
-  
+
   local spyassert_strs = {}
-  for _, str in pairs(generate_spyasserts(calltrace, {})) do
+  for _, str in pairs(generate_spyasserts(calltrace, {}, 0)) do
     table.insert(spyassert_strs, str)
   end
   local spyassert_str = vim.fn.join(spyassert_strs, "\n")

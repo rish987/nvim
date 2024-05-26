@@ -125,6 +125,8 @@ vim.keymap.set(
   { "n", "o", "x" },
   "<C-p>",
   function ()
+    -- local tbl = vim.F.pack_len("a", nil, "c")
+    -- vim.F.unpack_len(tbl)
     require('alternate').test()
     print"HERE"
   end
@@ -157,44 +159,112 @@ function M.disable_calltrace()
   disable = true
 end
 
-local function patch(objs)
-  local new_objs = {}
-  for _, obj in pairs(objs) do
-    local new_args = {}
-    for _, arg in ipairs(obj.args) do
-      if type(arg) == "function" then
-        -- must erase functions because they cannot be passed via RPC/JSON encoded
-        table.insert(new_args, "<erased fn>")
-      else
-        table.insert(new_args, arg)
+function M.unpatch(arg)
+  if type(arg) == "table" then
+    if arg["_patched"] then
+      for key, val in pairs(arg["_patched"]) do
+        arg[val] = arg[key]
+        arg[key] = nil
+      end
+      arg["_patched"] = nil
+    end
+    for key, val in pairs(arg) do
+      arg[key] = M.unpatch(val)
+    end
+  end
+
+  return arg
+end
+
+local function patch_arg(arg)
+  if type(arg) == "function" then
+    return "<erased fn>"
+  elseif type(arg) == "userdata" then
+    return "<erased userdata>"
+  elseif type(arg) == "thread" then
+    return "<erased thread>"
+  elseif type(arg) == "string" then
+    local success = pcall(vim.fn.json_encode, arg)
+    if success then
+      return arg
+    else
+      return "<erased invalid string>"
+    end
+  elseif type(arg) == "table" then
+    local new_tbl = {}
+    local has_num_key
+    local has_str_key
+    for key, _ in pairs(arg) do
+      if type(key) == "number" then
+        has_num_key = true
+        if has_str_key then break end
+      elseif type(key) == "string" then
+        has_str_key = true
+        if has_num_key then break end
       end
     end
-    obj.args = new_args
+    local should_patch = has_str_key and has_num_key
+    for key, val in pairs(arg) do
+      local new_key
+      if type(key) == "number" and should_patch then
+        new_key = "_patched" .. key
+
+        new_tbl["_patched"] = new_tbl["_patched"] or {}
+        new_tbl["_patched"][new_key] = key
+      elseif type(key) == "number" or type(key) == "string" then -- (ignore keys of other types)
+        new_key = key
+      end
+      if new_key then
+        new_tbl[new_key] = patch_arg(val)
+      end
+    end
+    return new_tbl
+  end
+
+  return arg
+end
+
+function M.patch(objs)
+  for _, obj in ipairs(objs) do
+    for key, arg in pairs(obj.args) do
+      obj.args[key] = patch_arg(arg)
+    end
+    -- TODO call patch_arg on return values as well
     -- local new_called = {}
     -- for _, call in ipairs(obj.called) do
     --   table.insert(new_called, patch(call))
     -- end
-    obj.called = patch(obj.called)
-
-    table.insert(new_objs, obj)
+    M.patch(obj.called)
   end
-  return new_objs
 end
+
+-- local function has_fn(objs)
+--   for _, obj in ipairs(objs) do
+--     for key, arg in pairs(obj.args) do
+--       if type(arg) == "function" then print"FOUND" end
+--     end
+--     has_fn(obj.called)
+--   end
+-- end
 
 function M.record_finish(testname)
   sess = testname
   local curr_objs = call_objs
   call_objs = {}
-  return patch(curr_objs)
+  M.patch(curr_objs)
+  -- has_fn(curr_objs)
+  -- vim.fn.json_encode(curr_objs)
+  return curr_objs
 end
 
 local whitelist = {
   -- ["overseer"] = true,
   ["alternate"] = true,
-  ["vim._editor"] = {
-    ["schedule"] = true,
-    ["F"] = {["unpack_len"] = true}
-  },
+  -- ["vim._editor"] = true,
+  -- ["vim._editor"] = {
+  --   -- ["schedule"] = true,
+  --   ["F"] = true
+  -- },
   -- ["nvim-task"] = true,
   -- ["nvim-task.config"] = true,
   -- ["vim.keymap"] = true,
@@ -204,16 +274,6 @@ local whitelist = {
 }
 
 -- TODO preprocess whitelist into more programmatic format
-
-local ignore_whitelist = false
-
--- vim.keymap.set(
---   { "n", "o", "x" },
---   "<C-p>",
---   function ()
---     test()
---   end
--- )
 
 -- if true then return M end
 
@@ -227,28 +287,6 @@ local _pack = function(...) return { n = _select("#", ...), ... } end
 
 local wrapped_mods = {}
 
-local function is_whitelisted(modname, submodnames, fnname)
-end
-
--- return of false indicates that this module is not whitelisted
--- return of nil indicates that this module completely whitelisted
--- return of table indicates that this module completely whitelisted
-local function get_submod_whitelist(modname, submodnames, fnname)
-  if ignore_whitelist then return true end
-  if not whitelist[modname] then return false end
-  if whitelist[modname] == true then return true end
-  local wl = whitelist[modname]
-  -- if not(type(whitelist[modname])) == "table" then return false end
-  for _, submodname in ipairs(submodnames) do
-    if not wl[submodname] then return false end
-    if wl[submodname] == true then return true end
-    wl = wl[submodname]
-  end
-
-  if not wl[fnname] then return false end
-  return true
-end
-
 local function trace_wrap(modname, submodnames, mod, wl)
   -- modules can be recursively nested, so this prevents an infinite loop
   wrapped_mods[mod] = true
@@ -259,21 +297,12 @@ local function trace_wrap(modname, submodnames, mod, wl)
     end
     if this_wl then
       if type(val) == "function" then
-        if type(wl) == "table" then
-          -- print(val_name) -- function specified in whitelist
-        end
+        -- if type(wl) == "table" then
+        --   -- print(val_name) -- function specified in whitelist
+        -- end
         local wrapped = function (...)
           disable = true
           local args = {...}
-          -- for i, a in ipairs(args) do
-          --   local a_str = vim.inspect(a) -- TODO make sure that this works if a is a string containing single/double quote characters
-          --   if i ~= #args then
-          --     args_string = args_string .. a_str .. ", "
-          --   else
-          --     args_string = args_string .. a_str
-          --   end
-          -- end
-          -- local call_string = ('require"%s".%s(%s)'):format(mod_name, val_name, args_string)
 
           local call_obj = {module = modname, submodules = submodnames, func = val_name, args = args, called = {}}
 
