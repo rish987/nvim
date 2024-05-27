@@ -252,6 +252,7 @@ function M.record_finish(testname)
   local curr_objs = call_objs
   call_objs = {}
   M.patch(curr_objs)
+  -- print('DBG[1]: config.lua:254: curr_objs=' .. vim.inspect(curr_objs))
   -- has_fn(curr_objs)
   -- vim.fn.json_encode(curr_objs)
   return curr_objs
@@ -260,6 +261,7 @@ end
 local whitelist = {
   -- ["overseer"] = true,
   ["alternate"] = true,
+  -- ["alternate"] = {test = true},
   -- ["vim._editor"] = true,
   -- ["vim._editor"] = {
   --   -- ["schedule"] = true,
@@ -285,11 +287,9 @@ local _pack = function(...) return { n = _select("#", ...), ... } end
 --   return modname .. "." .. vim.fn.join(submodnames, ".")
 -- end
 
-local wrapped_mods = {}
-
-local function trace_wrap(modname, submodnames, mod, wl)
+local function _foreach_modfn(modname, submodnames, mod, seen_mods, wl, cb)
   -- modules can be recursively nested, so this prevents an infinite loop
-  wrapped_mods[mod] = true
+  seen_mods[mod] = true
   for val_name, val in pairs(mod) do
     local this_wl = wl
     if type(wl) == "table" then
@@ -297,85 +297,78 @@ local function trace_wrap(modname, submodnames, mod, wl)
     end
     if this_wl then
       if type(val) == "function" then
-        -- if type(wl) == "table" then
-        --   -- print(val_name) -- function specified in whitelist
-        -- end
-        local wrapped = function (...)
-          disable = true
-          local args = {...}
-
-          local call_obj = {module = modname, submodules = submodnames, func = val_name, args = args, called = {}}
-
-          local parent_i = 2
-          local has_parent = false
-          while true do
-            if not debug.getinfo(parent_i) then break end
-            local n, v = debug.getlocal(parent_i, 2)
-            if n and n == "call_obj" then
-              has_parent = true
-              table.insert(v.called, call_obj)
-            end
-            parent_i = parent_i + 1
-          end
-
-          disable = false
-
-          -- if true then return val(...) end -- FIXME for some reason we lose access to the full stack doing this
-
-          local ret = _pack(val(...))
-
-          disable = true
-
-          if not has_parent then
-            table.insert(call_objs, call_obj)
-          end
-
-          disable = false
-
-          return _unpack(ret, 1, ret.n)
-        end
-        mod[val_name] = function (...)
-          if disable then
-            return val(...)
-          else
-            return wrapped(...)
-          end
-        end
-      elseif type(val) == "table" and not wrapped_mods[val] then
+        cb(modname, submodnames, mod, val_name, val)
+      elseif type(val) == "table" and not seen_mods[val] then
         local new_submodnames = vim.deepcopy(submodnames)
         table.insert(new_submodnames, val_name)
-        trace_wrap(modname, new_submodnames, val, this_wl)
+        _foreach_modfn(modname, new_submodnames, val, seen_mods, this_wl, cb)
       end
     end
   end
 end
 
-disable = true
-for modname, module in pairs(package.loaded) do
-  -- if modname:match("vim") then
-  --   print(modname)
-  -- end
-
-  if type(module) == "table" and modname ~= "package" then
-    -- TODO handle metatable (and __index field in particular)
-    local this_wl = whitelist
-    if type(whitelist) == "table" then
-      this_wl = whitelist[modname]
+function M.foreach_modfn(cb, wl)
+  for modname, module in pairs(package.loaded) do
+    local seen_mods = {}
+    if type(module) == "table" and modname ~= "package" then
+      -- TODO handle metatable (and __index field in particular)
+      local this_wl = wl
+      if type(wl) == "table" then
+        this_wl = wl[modname]
+      end
+      _foreach_modfn(modname, {}, module, seen_mods, this_wl, cb)
+    else
+      -- print(mod_name, type(module))
     end
-    trace_wrap(modname, {}, module, this_wl)
-
-    -- setmetatable(new_module, getmetatable(module))
-    --
-    -- -- if mod_name == "alternate" then
-    -- --   print("replacing", module, "with", new_module)
-    -- -- end
-    -- package.loaded[mod_name] = new_module
-  else
-    -- print(mod_name, type(module))
   end
-
-  ::continue::
 end
+
+local function trace_wrap(modname, submodnames, mod, fn_name, fn)
+  local wrapped = function (...)
+    disable = true
+    local args = {...}
+
+    local call_obj = {module = modname, submodules = submodnames, func = fn_name, args = args, called = {}}
+
+    local parent_i = 2
+    local has_parent = false
+    while true do
+      if not debug.getinfo(parent_i) then break end
+      local n, v = debug.getlocal(parent_i, 2)
+      if n and n == "call_obj" then
+        has_parent = true
+        table.insert(v.called, call_obj)
+      end
+      parent_i = parent_i + 1
+    end
+
+    disable = false
+
+    -- if true then return val(...) end -- FIXME for some reason we lose access to the full stack doing this
+
+    local ret = _pack(fn(...))
+
+    disable = true
+
+    if not has_parent then
+      table.insert(call_objs, call_obj)
+    end
+
+    disable = false
+
+    return _unpack(ret, 1, ret.n)
+  end
+  mod[fn_name] = function (...)
+    if disable then
+      return fn(...)
+    else
+      return wrapped(...)
+    end
+  end
+end
+
+disable = true
+M.foreach_modfn(trace_wrap, whitelist)
 disable = false
 
 return M

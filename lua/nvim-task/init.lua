@@ -183,6 +183,7 @@ local test_mappings = {
   duplicate_test = test_leader .. "d",
   delete_test = test_leader .. "D",
   find_test = test_leader .. "f",
+  trace_picker = test_leader .. "t",
 }
 
 local function maybe_play_recording()
@@ -443,8 +444,58 @@ function M.test_picker()
     })
 end
 
+function M.trace_picker()
+  local actions = require "telescope.actions"
+  local action_state = require "telescope.actions.state"
+  local finders = require "telescope.finders"
+  local make_entry = require "telescope.make_entry"
+  local pickers = require "telescope.pickers"
+  local conf = require("telescope.config").values
+
+  local results = {}
+
+  for test, _ in pairs(tests_data) do
+    if test ~= nvt_conf.temp_test_name and test ~= metadata_key then
+      table.insert(results, test)
+    end
+  end
+
+  if vim.tbl_isempty(results) then
+    vim.notify("No saved tests", vim.log.levels.WARN)
+    return
+  end
+
+  local opts = {}
+
+  return pickers
+    .new({}, {
+      prompt_title = string.format("Choose test (curr: %s)", curr_test or "[NONE]"),
+      finder = finders.new_table {
+        results = results,
+        entry_maker = make_entry.gen_from_file(),
+      },
+      sorter = conf.generic_sorter(opts),
+      previewer = conf.grep_previewer(opts),
+      attach_mappings = function(prompt_bufnr)
+        actions.select_default:replace(function()
+          local selection = action_state.get_selected_entry()
+
+          actions.close(prompt_bufnr)
+          new_nvim_task(selection.value)
+        end)
+
+        return true
+      end,
+    })
+end
+
 function M.pick_test()
   local picker = M.test_picker()
+  if picker then picker:find() end
+end
+
+function M.pick_trace()
+  local picker = M.trace_picker()
   if picker then picker:find() end
 end
 
@@ -475,6 +526,7 @@ vim.keymap.set("n", test_mappings.restart_test, M.restart)
 vim.keymap.set("n", test_mappings.exit_test, M.abort_curr_task)
 vim.keymap.set("n", test_mappings.find_test, M.pick_test)
 vim.keymap.set("n", test_mappings.blank_test, M.blank_sess)
+vim.keymap.set("n", test_mappings.trace_picker, M.pick_trace)
 
 return M
 
