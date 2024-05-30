@@ -399,7 +399,22 @@ local function new_nvim_task(test)
   end
 end
 
-function M.test_picker()
+local tracedisp_format_sub = [["%s".%s.%s]]
+local tracedisp_format = [["%s".%s]]
+local function modfn_to_str(modname, submodnames, fnname)
+  if #submodnames == 0 then
+    return tracedisp_format:format(modname, fnname)
+  end
+  return tracedisp_format_sub:format(modname, vim.fn.join(submodnames, "."), fnname)
+end
+
+function M.trace_picker()
+  if not curr_task then
+    vim.notify("No task is currently running", vim.log.levels.WARN)
+    return
+  end
+  -- TODO async delay until socket is connected
+
   local actions = require "telescope.actions"
   local action_state = require "telescope.actions.state"
   local finders = require "telescope.finders"
@@ -407,16 +422,10 @@ function M.test_picker()
   local pickers = require "telescope.pickers"
   local conf = require("telescope.config").values
 
-  local results = {}
-
-  for test, _ in pairs(tests_data) do
-    if test ~= nvt_conf.temp_test_name and test ~= metadata_key then
-      table.insert(results, test)
-    end
-  end
+  local results = run_child(("return require'nvim-task.config'.get_traceable_fns()"))
 
   if vim.tbl_isempty(results) then
-    vim.notify("No saved tests", vim.log.levels.WARN)
+    vim.notify("No traceable functions", vim.log.levels.WARN)
     return
   end
 
@@ -424,19 +433,24 @@ function M.test_picker()
 
   return pickers
     .new({}, {
-      prompt_title = string.format("Choose test (curr: %s)", curr_test or "[NONE]"),
+      prompt_title = string.format("Choose functions to trace", curr_test or "[NONE]"),
       finder = finders.new_table {
         results = results,
-        entry_maker = make_entry.gen_from_file(),
+        entry_maker = function(entry)
+          local disp = modfn_to_str(entry.modname, entry.submodnames, entry.fnname)
+          return {
+            value = entry,
+            display = disp,
+            ordinal = disp,
+          }
+        end
       },
-      sorter = conf.generic_sorter(opts),
-      previewer = conf.grep_previewer(opts),
+      -- sorter = conf.generic_sorter(opts),
+      -- previewer = conf.grep_previewer(opts),
       attach_mappings = function(prompt_bufnr)
         actions.select_default:replace(function()
           local selection = action_state.get_selected_entry()
-
           actions.close(prompt_bufnr)
-          new_nvim_task(selection.value)
         end)
 
         return true
@@ -444,7 +458,7 @@ function M.test_picker()
     })
 end
 
-function M.trace_picker()
+function M.test_picker()
   local actions = require "telescope.actions"
   local action_state = require "telescope.actions.state"
   local finders = require "telescope.finders"

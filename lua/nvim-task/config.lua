@@ -51,6 +51,67 @@ function M.write_data(data_file, new_data)
   vim.fn.writefile({json}, data_file)
 end
 
+function M.unpatch(arg)
+  if type(arg) == "table" then
+    if arg["_patched"] then
+      for key, val in pairs(arg["_patched"]) do
+        arg[val] = arg[key]
+        arg[key] = nil
+      end
+      arg["_patched"] = nil
+    end
+    for key, val in pairs(arg) do
+      arg[key] = M.unpatch(val)
+    end
+  end
+
+  return arg
+end
+
+local function _foreach_modfn(modname, submodnames, mod, seen_mods, wl, cb)
+  -- modules can be recursively nested, so this prevents an infinite loop
+  seen_mods[mod] = true
+  for val_name, val in pairs(mod) do
+    local this_wl = wl
+    if type(wl) == "table" then
+      this_wl = wl[val_name]
+    end
+    if this_wl then
+      if type(val) == "function" then
+        cb(modname, submodnames, mod, val_name, val)
+      elseif type(val) == "table" and not seen_mods[val] then
+        local new_submodnames = vim.deepcopy(submodnames)
+        table.insert(new_submodnames, val_name)
+        _foreach_modfn(modname, new_submodnames, val, seen_mods, this_wl, cb)
+      end
+    end
+  end
+end
+
+function M.foreach_modfn(cb, wl)
+  for modname, module in pairs(package.loaded) do
+    local seen_mods = {}
+    if type(module) == "table" and modname ~= "package" then
+      -- TODO handle metatable (and __index field in particular)
+      local this_wl = wl
+      if type(wl) == "table" then
+        this_wl = wl[modname]
+      end
+      _foreach_modfn(modname, {}, module, seen_mods, this_wl, cb)
+    else
+      -- print(mod_name, type(module))
+    end
+  end
+end
+
+function M.get_traceable_fns()
+  local ret = {}
+  M.foreach_modfn(function(modname, submodnames, _, valname, _)
+    table.insert(ret, {modname = modname, submodnames = submodnames, fnname = valname})
+  end, true)
+  return ret
+end
+
 if not vim.g.StartedByNvimTask then return M end
 
 local parent_sock = vim.fn.sockconnect("pipe", vim.g.NvimTaskParentSock, {rpc = true})
@@ -157,23 +218,6 @@ end
 
 function M.disable_calltrace()
   disable = true
-end
-
-function M.unpatch(arg)
-  if type(arg) == "table" then
-    if arg["_patched"] then
-      for key, val in pairs(arg["_patched"]) do
-        arg[val] = arg[key]
-        arg[key] = nil
-      end
-      arg["_patched"] = nil
-    end
-    for key, val in pairs(arg) do
-      arg[key] = M.unpatch(val)
-    end
-  end
-
-  return arg
 end
 
 local function patch_arg(arg)
@@ -286,42 +330,6 @@ local _pack = function(...) return { n = _select("#", ...), ... } end
 -- local submodstring = function(modname, submodnames)
 --   return modname .. "." .. vim.fn.join(submodnames, ".")
 -- end
-
-local function _foreach_modfn(modname, submodnames, mod, seen_mods, wl, cb)
-  -- modules can be recursively nested, so this prevents an infinite loop
-  seen_mods[mod] = true
-  for val_name, val in pairs(mod) do
-    local this_wl = wl
-    if type(wl) == "table" then
-      this_wl = wl[val_name]
-    end
-    if this_wl then
-      if type(val) == "function" then
-        cb(modname, submodnames, mod, val_name, val)
-      elseif type(val) == "table" and not seen_mods[val] then
-        local new_submodnames = vim.deepcopy(submodnames)
-        table.insert(new_submodnames, val_name)
-        _foreach_modfn(modname, new_submodnames, val, seen_mods, this_wl, cb)
-      end
-    end
-  end
-end
-
-function M.foreach_modfn(cb, wl)
-  for modname, module in pairs(package.loaded) do
-    local seen_mods = {}
-    if type(module) == "table" and modname ~= "package" then
-      -- TODO handle metatable (and __index field in particular)
-      local this_wl = wl
-      if type(wl) == "table" then
-        this_wl = wl[modname]
-      end
-      _foreach_modfn(modname, {}, module, seen_mods, this_wl, cb)
-    else
-      -- print(mod_name, type(module))
-    end
-  end
-end
 
 local function trace_wrap(modname, submodnames, mod, fn_name, fn)
   local wrapped = function (...)
