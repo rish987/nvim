@@ -3,14 +3,14 @@ local M = {}
 M.saved_test_name = "NvimTask_saved"
 M.temp_test_name = "NvimTask_curr"
 
-local function file_exists(filename)
-    local stat = vim.loop.fs_stat(filename)
-    return stat ~= nil and stat.type ~= nil
+function M.file_exists(filename)
+  local stat = vim.loop.fs_stat(filename)
+  return stat ~= nil and stat.type ~= nil
 end
 
 M.session_exists = function(sessname, sessdir)
   local sess_filename = require"resession.util".get_session_file(sessname, sessdir)
-  return file_exists(sess_filename)
+  return M.file_exists(sess_filename)
 end
 
 local log = require"vim.lsp.log"
@@ -91,7 +91,7 @@ end
 function M.foreach_modfn(cb, wl)
   for modname, module in pairs(package.loaded) do
     local seen_mods = {}
-    if type(module) == "table" and modname ~= "package" then
+    if type(module) == "table" and modname ~= "package" and modname ~= "_G" then
       -- TODO handle metatable (and __index field in particular)
       local this_wl = wl
       if type(wl) == "table" then
@@ -110,6 +110,11 @@ function M.get_traceable_fns()
     table.insert(ret, {modname = modname, submodnames = submodnames, fnname = valname})
   end, true)
   return ret
+end
+
+function M.modfun_key(modname, submodnames, fnname, quote)
+  if quote then modname = '"modname"' end
+  return #submodnames > 0 and modname .. "." .. vim.fn.join(submodnames, ".") or modname .. "." .. fnname
 end
 
 if not vim.g.StartedByNvimTask then return M end
@@ -220,7 +225,8 @@ function M.disable_calltrace()
   disable = true
 end
 
-local function patch_arg(arg)
+local function patch_arg(arg, seen_tbl_args)
+  seen_tbl_args = seen_tbl_args or {}
   if type(arg) == "function" then
     return "<erased fn>"
   elseif type(arg) == "userdata" then
@@ -235,34 +241,39 @@ local function patch_arg(arg)
       return "<erased invalid string>"
     end
   elseif type(arg) == "table" then
-    local new_tbl = {}
-    local has_num_key
-    local has_str_key
-    for key, _ in pairs(arg) do
-      if type(key) == "number" then
-        has_num_key = true
-        if has_str_key then break end
-      elseif type(key) == "string" then
-        has_str_key = true
-        if has_num_key then break end
+    if not seen_tbl_args[arg] then
+      seen_tbl_args[arg] = true
+      local new_tbl = {}
+      local has_num_key
+      local has_str_key
+      for key, _ in pairs(arg) do
+        if type(key) == "number" then
+          has_num_key = true
+          if has_str_key then break end
+        elseif type(key) == "string" then
+          has_str_key = true
+          if has_num_key then break end
+        end
       end
-    end
-    local should_patch = has_str_key and has_num_key
-    for key, val in pairs(arg) do
-      local new_key
-      if type(key) == "number" and should_patch then
-        new_key = "_patched" .. key
+      local should_patch = has_str_key and has_num_key
+      for key, val in pairs(arg) do
+        local new_key
+        if type(key) == "number" and should_patch then
+          new_key = "_patched" .. key
 
-        new_tbl["_patched"] = new_tbl["_patched"] or {}
-        new_tbl["_patched"][new_key] = key
-      elseif type(key) == "number" or type(key) == "string" then -- (ignore keys of other types)
-        new_key = key
+          new_tbl["_patched"] = new_tbl["_patched"] or {}
+          new_tbl["_patched"][new_key] = key
+        elseif type(key) == "number" or type(key) == "string" then -- (ignore keys of other types)
+          new_key = key
+        end
+        if new_key then
+          new_tbl[new_key] = patch_arg(val, seen_tbl_args)
+        end
       end
-      if new_key then
-        new_tbl[new_key] = patch_arg(val)
-      end
+      return new_tbl
+    else
+      return "<erased recursive reference>"
     end
-    return new_tbl
   end
 
   return arg
@@ -302,22 +313,23 @@ function M.record_finish(testname)
   return curr_objs
 end
 
-local whitelist = {
-  -- ["overseer"] = true,
-  ["alternate"] = true,
-  -- ["alternate"] = {test = true},
-  -- ["vim._editor"] = true,
-  -- ["vim._editor"] = {
-  --   -- ["schedule"] = true,
-  --   ["F"] = true
-  -- },
-  -- ["nvim-task"] = true,
-  -- ["nvim-task.config"] = true,
-  -- ["vim.keymap"] = true,
-  -- ["table"] = true,
-  -- ["string"] = true,
-  -- ["debug"] = true,
-}
+-- local whitelist = {
+--   -- ["overseer"] = true,
+--   ["alternate"] = true,
+--   -- ["alternate"] = {test = true},
+--   -- ["vim._editor"] = true,
+--   ["vim._editor"] = {
+--     ["api"] = {
+--       ["nvim_list_wins"] = true
+--     },
+--   },
+--   -- ["nvim-task"] = true,
+--   -- ["nvim-task.config"] = true,
+--   -- ["vim.keymap"] = true,
+--   -- ["table"] = true,
+--   -- ["string"] = true,
+--   -- ["debug"] = true,
+-- }
 
 -- TODO preprocess whitelist into more programmatic format
 
@@ -330,22 +342,27 @@ local _pack = function(...) return { n = _select("#", ...), ... } end
 -- local submodstring = function(modname, submodnames)
 --   return modname .. "." .. vim.fn.join(submodnames, ".")
 -- end
+local traced_calls = {
+  ["alternate.test"] = {["vim._editor.api.nvim_list_wins"] = true}
+}
 
-local function trace_wrap(modname, submodnames, mod, fn_name, fn)
+local function trace_wrap(modname, submodnames, mod, fnname, fn)
+  local key = M.modfun_key(modname, submodnames, fnname)
   local wrapped = function (...)
     disable = true
     local args = {...}
 
-    local call_obj = {module = modname, submodules = submodnames, func = fn_name, args = args, called = {}}
+    local call_obj = {module = modname, submodules = submodnames, func = fnname, key = key, args = args, called = {}}
 
     local parent_i = 2
-    local has_parent = false
+    local toplevel = traced_calls[key] ~= nil
     while true do
       if not debug.getinfo(parent_i) then break end
       local n, v = debug.getlocal(parent_i, 2)
-      if n and n == "call_obj" then
-        has_parent = true
+      if n and n == "call_obj" and traced_calls[v.key] and traced_calls[v.key][key] then
+        toplevel = false
         table.insert(v.called, call_obj)
+        break
       end
       parent_i = parent_i + 1
     end
@@ -358,7 +375,7 @@ local function trace_wrap(modname, submodnames, mod, fn_name, fn)
 
     disable = true
 
-    if not has_parent then
+    if toplevel then
       table.insert(call_objs, call_obj)
     end
 
@@ -366,7 +383,7 @@ local function trace_wrap(modname, submodnames, mod, fn_name, fn)
 
     return _unpack(ret, 1, ret.n)
   end
-  mod[fn_name] = function (...)
+  mod[fnname] = function (...)
     if disable then
       return fn(...)
     else
@@ -375,9 +392,33 @@ local function trace_wrap(modname, submodnames, mod, fn_name, fn)
   end
 end
 
-disable = true
-M.foreach_modfn(trace_wrap, whitelist)
-disable = false
+local function extend_wl_fn(whitelist, modname, submodnames, fnname)
+  local wl = whitelist
+  wl[modname] = wl[modname] or {}
+  wl = wl[modname]
+  for _, submodname in ipairs(submodnames) do
+    wl[submodname] = wl[submodname] or {}
+    wl = wl[submodname]
+  end
+  wl[fnname] = true
+end
+
+function M.set_traced_calls(traced_calls_raw)
+  local whitelist = {}
+  for toplevel, traceds in pairs(traced_calls_raw) do
+    extend_wl_fn(whitelist, toplevel.modname, toplevel.submodnames, toplevel.fnname)
+    local key = M.modfun_key(toplevel.modname, toplevel.submodnames, toplevel.fnname)
+    for _, traced in ipairs(traceds) do
+      traced_calls[key] = traced_calls[key] or {}
+      traced_calls[key][M.modfun_key(traced.modname, traced.submodnames, traced.fnname)] = true
+      extend_wl_fn(whitelist, traced.modname, traced.submodnames, traced.fnname)
+    end
+  end
+
+  disable = true
+  M.foreach_modfn(trace_wrap, whitelist)
+  disable = false
+end
 
 return M
 -- TODO incremental recordings scoped to session?

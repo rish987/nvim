@@ -29,6 +29,11 @@ return {
           end,
         })
       end
+      vim.api.nvim_create_autocmd("WinEnter", {
+        callback = function ()
+          if vim.bo.ft == "NvimTree" then require"alternate".alt_goto() end
+        end
+      })
       -- autoclose tree
       vim.api.nvim_create_autocmd("QuitPre", {
         callback = function()

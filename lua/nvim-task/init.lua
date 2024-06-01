@@ -184,6 +184,7 @@ local test_mappings = {
   delete_test = test_leader .. "D",
   find_test = test_leader .. "f",
   trace_picker = test_leader .. "t",
+  edit_test = test_leader .. "e",
 }
 
 local function maybe_play_recording()
@@ -222,6 +223,7 @@ local function task_cb (task)
   vim.keymap.set("t", test_mappings.exit_test, function () M.abort_curr_task() end, {buffer = buf})
   vim.keymap.set("t", test_mappings.restart_test, function () M.restart() end, {buffer = buf})
   vim.keymap.set("t", test_mappings.blank_test, function () M.blank_sess() end, {buffer = buf})
+  vim.keymap.set("t", test_mappings.edit_test, function () M.abort_curr_task(function () M.edit_curr_test() end) end, {buffer = buf})
   -- vim.keymap.set("t", test_mappings.duplicate_test, function () run_child(print"HERE") end, {buffer = buf})
 end
 
@@ -281,7 +283,7 @@ describe("auto-generated test", function()
 end)
 ]]
 
-local function get_funcpath(obj)
+function M.get_funcpath(obj)
   local modulestr = ([[require"%s"]]):format(obj.module)
   local modulepath = #obj.submodules > 0 and modulestr .. "." .. vim.fn.join(obj.submodules, ".") or modulestr
   return modulepath .. "." .. obj.func, modulepath
@@ -289,7 +291,7 @@ end
 
 local function generate_spyons(calltrace, generated)
   for _, obj in ipairs(calltrace) do
-    local funcpath, modulepath = get_funcpath(obj)
+    local funcpath, modulepath = M.get_funcpath(obj)
     if not generated[funcpath] then
       generated[funcpath] = spyon_fmt:format(modulepath, obj.func)
     end
@@ -300,7 +302,7 @@ end
 
 local function generate_spyasserts(calltrace, generated, depth)
   for _, obj in ipairs(calltrace) do
-    local funcpath = get_funcpath(obj)
+    local funcpath = M.get_funcpath(obj)
     local args_string = ""
     for i, arg in ipairs(obj.args) do
       local a_str = vim.inspect(arg) -- TODO make sure that this works if a is a string containing single/double quote characters
@@ -317,6 +319,17 @@ local function generate_spyasserts(calltrace, generated, depth)
     generate_spyasserts(obj.called, generated, depth + 1)
   end
   return generated
+end
+
+function M.edit_curr_test()
+  if not curr_test then return end
+  local test_filepath = testdir .. ("/%s_spec.lua"):format(curr_test)
+
+  if nvt_conf.file_exists(test_filepath) then
+    vim.cmd("edit " .. test_filepath)
+  else
+    vim.notify(("No test file for test '%s' exists"):format(curr_test))
+  end
 end
 
 local function make_test(test)
@@ -408,17 +421,22 @@ local function modfn_to_str(modname, submodnames, fnname)
   return tracedisp_format_sub:format(modname, vim.fn.join(submodnames, "."), fnname)
 end
 
-function M.trace_picker()
+function trace_previewer()
+  return require"telescope.previewers".new_buffer_previewer({
+    define_preview = function(self, entry)
+      vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, true, vim.split("", "\n"))
+    end,
+  })
+end
+
+local function modfn_picker(title, attach_mappings)
   if not curr_task then
     vim.notify("No task is currently running", vim.log.levels.WARN)
     return
   end
   -- TODO async delay until socket is connected
 
-  local actions = require "telescope.actions"
-  local action_state = require "telescope.actions.state"
   local finders = require "telescope.finders"
-  local make_entry = require "telescope.make_entry"
   local pickers = require "telescope.pickers"
   local conf = require("telescope.config").values
 
@@ -433,7 +451,7 @@ function M.trace_picker()
 
   return pickers
     .new({}, {
-      prompt_title = string.format("Choose functions to trace", curr_test or "[NONE]"),
+      prompt_title = title,
       finder = finders.new_table {
         results = results,
         entry_maker = function(entry)
@@ -445,17 +463,51 @@ function M.trace_picker()
           }
         end
       },
+      mappings = {
+        ["J"] = function() print"HERE" end,
+      },
       -- sorter = conf.generic_sorter(opts),
       -- previewer = conf.grep_previewer(opts),
-      attach_mappings = function(prompt_bufnr)
-        actions.select_default:replace(function()
-          local selection = action_state.get_selected_entry()
-          actions.close(prompt_bufnr)
-        end)
-
-        return true
-      end,
+      attach_mappings = attach_mappings,
+      sorter = conf.generic_sorter(opts),
+      previewer = trace_previewer()
     })
+end
+
+local function trace_picker_subcall(toplevel)
+  local actions = require "telescope.actions"
+  local action_state = require "telescope.actions.state"
+
+  return modfn_picker(string.format("Choose subcalls to trace for %s",
+    nvt_conf.modfun_key(toplevel.modname, toplevel.submodnames, toplevel.fnname, true)),
+    function(_, map)
+      actions.select_default:replace(function()
+        local selection = action_state.get_selected_entry()
+        print('In subcall picker')
+      end)
+      return true
+    end)
+end
+
+function M.trace_picker_toplevel()
+  local actions = require "telescope.actions"
+  local action_state = require "telescope.actions.state"
+
+  return modfn_picker(string.format("Choose functions to trace"),
+    function(_, map)
+    map("n", "K", function()
+    end)
+    actions.select_default:replace(function()
+      local selection = action_state.get_selected_entry()
+      vim.schedule(function()
+        local subcall_picker = trace_picker_subcall(selection.value)
+        if subcall_picker then
+          subcall_picker:find()
+        end
+      end)
+    end)
+    return true
+  end)
 end
 
 function M.test_picker()
@@ -509,7 +561,7 @@ function M.pick_test()
 end
 
 function M.pick_trace()
-  local picker = M.trace_picker()
+  local picker = M.trace_picker_toplevel()
   if picker then picker:find() end
 end
 
@@ -540,6 +592,7 @@ vim.keymap.set("n", test_mappings.restart_test, M.restart)
 vim.keymap.set("n", test_mappings.exit_test, M.abort_curr_task)
 vim.keymap.set("n", test_mappings.find_test, M.pick_test)
 vim.keymap.set("n", test_mappings.blank_test, M.blank_sess)
+vim.keymap.set("n", test_mappings.edit_test, M.edit_curr_test)
 vim.keymap.set("n", test_mappings.trace_picker, M.pick_trace)
 
 return M
