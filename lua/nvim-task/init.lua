@@ -257,9 +257,10 @@ vim.api.nvim_create_autocmd("User", {
   end
 })
 
-local sessionload_fmt = [[resession.load(%s, { dir = %s })]] -- session name, directory
+local sessionload_fmt = [[resession.load("%s", { dir = "%s" })]] -- session name, directory
 local spyon_fmt = [[spy.on(%s, "%s")]] -- table, entry
 local spyassert_fmt = [[    assert.spy(%s).was_called_with(%s)]] -- function name, arg list
+local call_fmt = [[    %s(%s)]] -- function name, arg list
 local feedkeys_fmt = [[    vim.fn.feedkeys(vim.api.nvim_replace_termcodes("%s", true, true, true))]] -- keys from recording
 
 local testfile_fmt = [[
@@ -300,22 +301,30 @@ local function generate_spyons(calltrace, generated)
   return generated
 end
 
+local function generate_args_string(obj)
+  local args_string = ""
+  for i, arg in ipairs(obj.args) do
+    local a_str = vim.inspect(arg) -- TODO make sure that this works if a is a string containing single/double quote characters
+    if i ~= #obj.args then
+      args_string = args_string .. a_str .. ", "
+    else
+      args_string = args_string .. a_str
+    end
+  end
+  return args_string
+end
+
+local function generate_call(obj)
+  return call_fmt:format(M.get_funcpath(obj), generate_args_string(obj))
+end
+
+local function generate_spyassert(obj)
+  return spyassert_fmt:format(M.get_funcpath(obj), generate_args_string(obj))
+end
+
 local function generate_spyasserts(calltrace, generated, depth)
-  for _, obj in ipairs(calltrace) do
-    local funcpath = M.get_funcpath(obj)
-    local args_string = ""
-    for i, arg in ipairs(obj.args) do
-      local a_str = vim.inspect(arg) -- TODO make sure that this works if a is a string containing single/double quote characters
-      if i ~= #obj.args then
-        args_string = args_string .. a_str .. ", "
-      else
-        args_string = args_string .. a_str
-      end
-    end
-    table.insert(generated, spyassert_fmt:format(funcpath, args_string))
-    if depth == 0 then
-      table.insert(generated, "") -- insert newline between top-level calls
-    end
+  for i, obj in ipairs(calltrace) do
+    table.insert(generated, generate_spyassert(obj))
     generate_spyasserts(obj.called, generated, depth + 1)
   end
   return generated
@@ -344,11 +353,24 @@ local function make_test(test)
   local spyon_str = vim.fn.join(spyon_strs, "\n")
 
   local spyassert_strs = {}
-  for _, str in pairs(generate_spyasserts(calltrace, {}, 0)) do
-    table.insert(spyassert_strs, str)
+  for i, obj in ipairs(calltrace) do
+    if obj.mapping then
+      table.insert(spyassert_strs, generate_call(obj))
+    else
+      table.insert(spyassert_strs, generate_spyassert(obj))
+    end
+
+    for _, str in pairs(generate_spyasserts(obj.called, {}, 0)) do
+      table.insert(spyassert_strs, str)
+    end
+
+    if i ~= #calltrace then
+      table.insert(spyassert_strs, "")
+    end
   end
   local spyassert_str = vim.fn.join(spyassert_strs, "\n")
 
+  -- TODO HERE
   local feedkeys_str = feedkeys_fmt:format(data.recording)
 
   local test_str = testfile_fmt:format(sessionload_str, spyon_str, test, feedkeys_str, spyassert_str)

@@ -187,17 +187,6 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
   end,
 })
 
-vim.keymap.set(
-  { "n", "o", "x" },
-  "<C-p>",
-  function ()
-    -- local tbl = vim.F.pack_len("a", nil, "c")
-    -- vim.F.unpack_len(tbl)
-    require('alternate').test()
-    print"HERE"
-  end
-)
-
 -- list of modules that are used in the function override,
 -- and must therefore be temporarily reset to the originals when used in the function
 -- in order to avoid inifinite looping
@@ -346,6 +335,19 @@ local traced_calls = {
   ["alternate.test"] = {["vim._editor.api.nvim_list_wins"] = true}
 }
 
+local function find_parent_fn(vari, varname, cb)
+  local parent_i = 3
+  while true do
+    if not debug.getinfo(parent_i) then break end
+    local n, v = debug.getlocal(parent_i, vari)
+    if n and n == varname then
+      cb(n, v)
+      break
+    end
+    parent_i = parent_i + 1
+  end
+end
+
 local function trace_wrap(modname, submodnames, mod, fnname, fn)
   local key = M.modfun_key(modname, submodnames, fnname)
   local wrapped = function (...)
@@ -354,18 +356,13 @@ local function trace_wrap(modname, submodnames, mod, fnname, fn)
 
     local call_obj = {module = modname, submodules = submodnames, func = fnname, key = key, args = args, called = {}}
 
-    local parent_i = 2
     local toplevel = traced_calls[key] ~= nil
-    while true do
-      if not debug.getinfo(parent_i) then break end
-      local n, v = debug.getlocal(parent_i, 2)
-      if n and n == "call_obj" and traced_calls[v.key] and traced_calls[v.key][key] then
+    find_parent_fn(2, "call_obj", function(_, v)
+      if traced_calls[v.key] and traced_calls[v.key][key] then
         toplevel = false
         table.insert(v.called, call_obj)
-        break
       end
-      parent_i = parent_i + 1
-    end
+    end)
 
     disable = false
 
@@ -376,6 +373,9 @@ local function trace_wrap(modname, submodnames, mod, fnname, fn)
     disable = true
 
     if toplevel then
+      find_parent_fn(1, "nvt_mapping", function(_, v)
+        call_obj.mapping = v
+      end)
       table.insert(call_objs, call_obj)
     end
 
@@ -419,6 +419,31 @@ function M.set_traced_calls(traced_calls_raw)
   M.foreach_modfn(trace_wrap, whitelist)
   disable = false
 end
+
+M.set_traced_calls({
+  [{
+    modname = "alternate",
+    submodnames = {},
+    fnname = "test"
+  }] = {
+    {
+      modname = "vim._editor",
+      submodnames = {"api"},
+      fnname = "nvim_list_wins"
+    }
+  }
+})
+
+vim.keymap.set(
+  { "n", "o", "x" },
+  "<C-p>",
+  function ()
+    -- local tbl = vim.F.pack_len("a", nil, "c")
+    -- vim.F.unpack_len(tbl)
+    require('alternate').test()
+    print"HERE"
+  end
+)
 
 return M
 -- TODO incremental recordings scoped to session?
