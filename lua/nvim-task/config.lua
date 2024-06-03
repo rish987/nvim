@@ -374,7 +374,7 @@ local function trace_wrap(modname, submodnames, mod, fnname, fn)
 
     if toplevel then
       find_parent_fn(1, "nvt_mapping", function(_, v)
-        call_obj.mapping = v
+        call_obj.mapping = vim.fn.keytrans(vim.api.nvim_replace_termcodes(v, true, true, true))
       end)
       table.insert(call_objs, call_obj)
     end

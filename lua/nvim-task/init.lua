@@ -262,6 +262,7 @@ local spyon_fmt = [[spy.on(%s, "%s")]] -- table, entry
 local spyassert_fmt = [[    assert.spy(%s).was_called_with(%s)]] -- function name, arg list
 local call_fmt = [[    %s(%s)]] -- function name, arg list
 local feedkeys_fmt = [[    vim.fn.feedkeys(vim.api.nvim_replace_termcodes("%s", true, true, true))]] -- keys from recording
+local feedkeys_fmt_noreplace = [[    vim.fn.feedkeys("%s")]] -- keys from recording
 
 local testfile_fmt = [[
 local spy = require('luassert.spy')
@@ -275,10 +276,6 @@ local resession = require"resession"
 
 describe("auto-generated test", function()
   it("'%s'", function()
-    -- feed keys from recording
-%s
-
-    -- test that spies were called
 %s
   end)
 end)
@@ -322,6 +319,13 @@ local function generate_spyassert(obj)
   return spyassert_fmt:format(M.get_funcpath(obj), generate_args_string(obj))
 end
 
+local function generate_feedkeys(map)
+  if vim.api.nvim_replace_termcodes(map, true, true, true) == map then
+    return feedkeys_fmt_noreplace:format(map)
+  end
+  return feedkeys_fmt:format(map)
+end
+
 local function generate_spyasserts(calltrace, generated, depth)
   for i, obj in ipairs(calltrace) do
     table.insert(generated, generate_spyassert(obj))
@@ -352,31 +356,54 @@ local function make_test(test)
   end
   local spyon_str = vim.fn.join(spyon_strs, "\n")
 
-  local spyassert_strs = {}
+  local remaining_recording = data.recording
+  local pending_test_strs = {}
+
+  local test_strs = {}
   for i, obj in ipairs(calltrace) do
+    local tbl = pending_test_strs
     if obj.mapping then
-      table.insert(spyassert_strs, generate_call(obj))
+      tbl = test_strs
+      local map_pos_start, map_pos_end = remaining_recording:find(obj.mapping, nil, true)
+      local recording_before_map = remaining_recording:sub(1, map_pos_start - 1)
+      if #recording_before_map > 0 then
+        table.insert(tbl, generate_feedkeys(recording_before_map))
+        for _, str in ipairs(pending_test_strs) do
+          table.insert(tbl, str)
+        end
+        table.insert(tbl, "")
+        pending_test_strs = {}
+      end
+      remaining_recording = remaining_recording:sub(map_pos_end + 1)
+      table.insert(tbl, generate_call(obj))
     else
-      table.insert(spyassert_strs, generate_spyassert(obj))
+      table.insert(tbl, generate_spyassert(obj))
     end
 
-    for _, str in pairs(generate_spyasserts(obj.called, {}, 0)) do
-      table.insert(spyassert_strs, str)
+    for _, str in ipairs(generate_spyasserts(obj.called, {}, 0)) do
+      table.insert(tbl, str)
     end
 
-    if i ~= #calltrace then
-      table.insert(spyassert_strs, "")
+    if i ~= #calltrace or #remaining_recording > 0 then
+      table.insert(tbl, "")
     end
   end
-  local spyassert_str = vim.fn.join(spyassert_strs, "\n")
 
-  -- TODO HERE
-  local feedkeys_str = feedkeys_fmt:format(data.recording)
+  if #remaining_recording > 0 then
+    table.insert(test_strs, generate_feedkeys(remaining_recording))
+    if #pending_test_strs > 0 then table.insert(test_strs, "") end
+    for _, str in ipairs(pending_test_strs) do
+      table.insert(test_strs, str)
+    end
+    pending_test_strs = {}
+  end
 
-  local test_str = testfile_fmt:format(sessionload_str, spyon_str, test, feedkeys_str, spyassert_str)
+  local test_str = vim.fn.join(test_strs, "\n")
+
+  local testfile_str = testfile_fmt:format(sessionload_str, spyon_str, test, test_str)
 
   local test_filepath = testdir .. ("/%s_spec.lua"):format(test)
-  vim.fn.writefile(vim.fn.split(test_str, "\n"), test_filepath)
+  vim.fn.writefile(vim.fn.split(testfile_str, "\n"), test_filepath)
   print("wrote", test_filepath)
 end
 
