@@ -58,6 +58,11 @@ local function set_test_metadata(value)
   set_test_data(metadata_key, value)
 end
 
+if not curr_test then
+  curr_test = nvt_conf.temp_test_name
+  set_test_metadata({curr_test = curr_test})
+end
+
 local function del_test_data(test)
   tests_data[test] = nil
 
@@ -131,6 +136,8 @@ local function set_curr_test(test)
   set_test_metadata({curr_test = curr_test})
 end
 
+local trace_playback = false
+
 local finished_playback = false
 local finished_playback_restart = false
 
@@ -145,6 +152,7 @@ M.abort_curr_task = function (cb)
       local term = curr_task.strategy.term
       curr_task = nil
       finished_playback = false
+      trace_playback = false
       finished_playback_restart = false
 
       print"task aborted"
@@ -185,7 +193,19 @@ local test_mappings = {
   find_test = test_leader .. "f",
   trace_picker = test_leader .. "t",
   edit_test = test_leader .. "e",
+  trace_test = test_leader .. "a",
 }
+
+-- TODO status line indicator for current recording and keymap to clear recording
+local function run_child(code, args)
+  args = args or {}
+  return vim.fn.rpcrequest(curr_task.sock, "nvim_exec_lua", code, args)
+end
+
+local function run_child_notify(code, args)
+  args = args or {}
+  vim.fn.rpcnotify(curr_task.sock, "nvim_exec_lua", code, args)
+end
 
 local function maybe_play_recording()
   if finished_playback_restart then
@@ -200,6 +220,11 @@ local function maybe_play_recording()
   local sess_data = curr_test_data()
   if sess_data and vim.fn.reg_recording() == "" and sess_data.recording then
     finished_playback = require"recorder".playRecording()
+    if finished_playback and trace_playback then
+      trace_playback = false
+      local calltrace_data = run_child("return require'nvim-task.config'.calltrace_end()")
+      set_test_data(curr_test, {calltrace = calltrace_data})
+    end
     return
   end
   vim.fn.feedkeys(vim.api.nvim_replace_termcodes(test_mappings.play_recording_shortcut, true, true, true), "n")
@@ -210,12 +235,6 @@ function M.set_child_sock()
   -- print("child sock:", curr_task.sock)
 end
 
--- TODO status line indicator for current recording and keymap to clear recording
-local function run_child(code, args)
-  args = args or {}
-  return vim.fn.rpcrequest(curr_task.sock, "nvim_exec_lua", code, args)
-end
-
 local function task_cb (task)
   curr_task = task
   local buf = task.strategy.term.bufnr
@@ -224,6 +243,7 @@ local function task_cb (task)
   vim.keymap.set("t", test_mappings.restart_test, function () M.restart() end, {buffer = buf})
   vim.keymap.set("t", test_mappings.blank_test, function () M.blank_sess() end, {buffer = buf})
   vim.keymap.set("t", test_mappings.edit_test, function () M.abort_curr_task(function () M.edit_curr_test() end) end, {buffer = buf})
+  vim.keymap.set("t", test_mappings.trace_test, function () M.restart_trace() end, {buffer = buf})
   -- vim.keymap.set("t", test_mappings.duplicate_test, function () run_child(print"HERE") end, {buffer = buf})
 end
 
@@ -240,10 +260,15 @@ vim.api.nvim_create_autocmd("User", {
       if sess_data.recording then
         vim.fn.setreg(reg_override, vim.api.nvim_replace_termcodes(sess_data.recording, true, true, true), "c")
         require"recorder".setRegOverride(reg_override)
+        if trace_playback then
+          run_child_notify("require'nvim-task.config'.calltrace_start()")
+        end
       end
     end
   end
 })
+
+-- TODO add a way to abort recording playback
 
 vim.api.nvim_create_autocmd("User", {
   pattern = "NvimRecorderRecordStart",
@@ -251,8 +276,7 @@ vim.api.nvim_create_autocmd("User", {
     if test_is_open() then
       started_recording = true
       require"recorder".setRegOverride(reg_override)
-      run_child("require'nvim-task.config'.save_session()")
-      -- run_child("require'nvim-task.config'.enable_calltrace()")
+      run_child_notify("require'nvim-task.config'.save_session()")
     end
   end
 })
@@ -335,7 +359,6 @@ local function generate_spyasserts(calltrace, generated, depth)
 end
 
 function M.edit_curr_test()
-  if not curr_test then return end
   local test_filepath = testdir .. ("/%s_spec.lua"):format(curr_test)
 
   if nvt_conf.file_exists(test_filepath) then
@@ -411,8 +434,7 @@ vim.api.nvim_create_autocmd("User", {
   pattern = "NvimRecorderRecordEnd",
   callback = function (data)
     if started_recording --[[ and sess_is_open() ]] then
-      run_child("require'nvim-task.config'.disable_calltrace()")
-      vim.ui.input({ prompt = "Test name" }, function(name)
+      vim.ui.input({ prompt = "Test name: " }, function(name)
         if name then
           local get_session_file = require"resession.util".get_session_file
           local saved_file = get_session_file(nvt_conf.saved_test_name, sessiondir)
@@ -420,10 +442,10 @@ vim.api.nvim_create_autocmd("User", {
           -- TODO check and confirm override if session already exists
           print("renaming session:", saved_file, new_file)
           vim.loop.fs_rename(saved_file, new_file)
-          local calltrace_data = run_child(("return require'nvim-task.config'.record_finish(%s)"):format(name))
+          run_child_notify(("require'nvim-task.config'.record_finish(%s)"):format(name))
 
           set_curr_test(name)
-          set_test_data(curr_test, {sess = name, recording = vim.fn.keytrans(data.data.recording), calltrace = calltrace_data})
+          set_test_data(curr_test, {sess = name, recording = vim.fn.keytrans(data.data.recording)})
 
           make_test(name)
         end
@@ -437,7 +459,7 @@ local templates_registered = false
 
 local function _new_nvim_task(test)
   local overseer = require("overseer")
-  if not test then test = curr_test or nvt_conf.temp_test_name end
+  if not test then test = curr_test end
   local data = test == nvt_conf.temp_test_name and {sess = nvt_conf.temp_test_name} or tests_data[test]
 
   print("loading test:", test)
@@ -479,10 +501,6 @@ function trace_previewer()
 end
 
 local function modfn_picker(title, attach_mappings)
-  if not curr_task then
-    vim.notify("No task is currently running", vim.log.levels.WARN)
-    return
-  end
   -- TODO async delay until socket is connected
 
   local finders = require "telescope.finders"
@@ -512,9 +530,6 @@ local function modfn_picker(title, attach_mappings)
           }
         end
       },
-      mappings = {
-        ["J"] = function() print"HERE" end,
-      },
       -- sorter = conf.generic_sorter(opts),
       -- previewer = conf.grep_previewer(opts),
       attach_mappings = attach_mappings,
@@ -523,16 +538,21 @@ local function modfn_picker(title, attach_mappings)
     })
 end
 
-local function trace_picker_subcall(toplevel)
+local function trace_picker_subcall(traced_calls, key)
   local actions = require "telescope.actions"
   local action_state = require "telescope.actions.state"
 
   return modfn_picker(string.format("Choose subcalls to trace for %s",
-    nvt_conf.modfun_key(toplevel.modname, toplevel.submodnames, toplevel.fnname, true)),
-    function(_, map)
+    key),
+    function(prompt_bufnr, map)
+      map("n", "K", function()
+        local selection = action_state.get_selected_entry()
+        traced_calls[selection.value] = true
+      end)
       actions.select_default:replace(function()
         local selection = action_state.get_selected_entry()
-        print('In subcall picker')
+        traced_calls[selection.value] = true
+        actions.close(prompt_bufnr)
       end)
       return true
     end)
@@ -541,6 +561,7 @@ end
 function M.trace_picker_toplevel()
   local actions = require "telescope.actions"
   local action_state = require "telescope.actions.state"
+  local traced_calls = {}
 
   return modfn_picker(string.format("Choose functions to trace"),
     function(_, map)
@@ -549,9 +570,12 @@ function M.trace_picker_toplevel()
     actions.select_default:replace(function()
       local selection = action_state.get_selected_entry()
       vim.schedule(function()
-        local subcall_picker = trace_picker_subcall(selection.value)
+        traced_calls[selection.value] = {}
+        local subcall_picker = trace_picker_subcall(traced_calls[selection.value],
+          nvt_conf.modfun_key(selection.value.modname, selection.value.submodnames, selection.value.fnname, true))
         if subcall_picker then
           subcall_picker:find()
+          vim.print(traced_calls)
         end
       end)
     end)
@@ -584,7 +608,7 @@ function M.test_picker()
 
   return pickers
     .new({}, {
-      prompt_title = string.format("Choose test (curr: %s)", curr_test or "[NONE]"),
+      prompt_title = string.format("Choose test (curr: %s)", curr_test),
       finder = finders.new_table {
         results = results,
         entry_maker = make_entry.gen_from_file(),
@@ -610,8 +634,15 @@ function M.pick_test()
 end
 
 function M.pick_trace()
+  M.restart_trace()
   local picker = M.trace_picker_toplevel()
   if picker then picker:find() end
+end
+
+function M.restart_trace()
+  trace_playback = true
+  vim.notify("starting tracing session...")
+  new_nvim_task()
 end
 
 function M.restart()
@@ -625,7 +656,7 @@ end
 
 function M.blank_sess()
   if curr_task then
-    run_child("require'nvim-task.config'.abort_temp_save()")
+    run_child_notify("require'nvim-task.config'.abort_temp_save()")
   end
 
   if nvt_conf.session_exists(nvt_conf.temp_test_name, sessiondir) then

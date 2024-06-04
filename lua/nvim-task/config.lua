@@ -206,12 +206,19 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
 local disable = true
 local call_objs = {}
 
-function M.enable_calltrace()
+function M.calltrace_start()
   disable = false
 end
 
-function M.disable_calltrace()
+function M.calltrace_end()
   disable = true
+  local curr_objs = call_objs
+  call_objs = {}
+  M.patch(curr_objs)
+  -- print('DBG[1]: config.lua:254: curr_objs=' .. vim.inspect(curr_objs))
+  -- has_fn(curr_objs)
+  -- vim.fn.json_encode(curr_objs)
+  return curr_objs
 end
 
 local function patch_arg(arg, seen_tbl_args)
@@ -293,13 +300,6 @@ end
 
 function M.record_finish(testname)
   sess = testname
-  local curr_objs = call_objs
-  call_objs = {}
-  M.patch(curr_objs)
-  -- print('DBG[1]: config.lua:254: curr_objs=' .. vim.inspect(curr_objs))
-  -- has_fn(curr_objs)
-  -- vim.fn.json_encode(curr_objs)
-  return curr_objs
 end
 
 -- local whitelist = {
@@ -408,7 +408,7 @@ function M.set_traced_calls(traced_calls_raw)
   for toplevel, traceds in pairs(traced_calls_raw) do
     extend_wl_fn(whitelist, toplevel.modname, toplevel.submodnames, toplevel.fnname)
     local key = M.modfun_key(toplevel.modname, toplevel.submodnames, toplevel.fnname)
-    for _, traced in ipairs(traceds) do
+    for traced, _ in pairs(traceds) do
       traced_calls[key] = traced_calls[key] or {}
       traced_calls[key][M.modfun_key(traced.modname, traced.submodnames, traced.fnname)] = true
       extend_wl_fn(whitelist, traced.modname, traced.submodnames, traced.fnname)
@@ -426,11 +426,11 @@ M.set_traced_calls({
     submodnames = {},
     fnname = "test"
   }] = {
-    {
+    [{
       modname = "vim._editor",
       submodnames = {"api"},
       fnname = "nvim_list_wins"
-    }
+    }] = true
   }
 })
 
