@@ -159,7 +159,7 @@ local function _abort_curr_task()
     a_util.scheduler()
     term:close()
     if was_open then
-      a_util.sleep(50)
+      a_util.sleep(100)
     end
 
     require"recorder".abortPlayback(true)
@@ -187,7 +187,7 @@ end)
 
 local test_leader = vim.g.StartedByNvimTask and "<C-A-x>" or "<C-x>"
 local test_mappings = {
-  play_recording_shortcut = "<tab>",
+  play_recording_shortcut = vim.g.StartedByNvimTask and "<C-tab>" or "<tab>",
   restart_test = test_leader .. "r",
   exit_test = test_leader .. "x",
   blank_test = test_leader .. "b",
@@ -200,37 +200,13 @@ local test_mappings = {
 }
 
 -- TODO status line indicator for current recording and keymap to clear recording
-local function run_child(code, args)
-  args = args or {}
-  return vim.fn.rpcrequest(curr_task.sock, "nvim_exec_lua", code, args)
+local function run_child(code, ...)
+  return vim.fn.rpcrequest(curr_task.sock, "nvim_exec_lua", code, {...})
 end
 
 local function run_child_notify(code, args)
   args = args or {}
   vim.fn.rpcnotify(curr_task.sock, "nvim_exec_lua", code, args)
-end
-
-local function maybe_play_recording()
-  if finished_playback_restart then
-    M.restart()
-    return
-  end
-  if finished_playback then
-    print(("playback finished, restart test or press '%s' again to replay"):format(test_mappings.play_recording_shortcut))
-    finished_playback_restart = true
-    return
-  end
-  local sess_data = curr_test_data()
-  if sess_data and vim.fn.reg_recording() == "" and sess_data.recording then
-    finished_playback = require"recorder".playRecording()
-    if finished_playback and trace_playback then
-      trace_playback = false
-      local calltrace_data = run_child("return require'nvim-task.config'.calltrace_end()")
-      set_test_data(curr_test, {calltrace = calltrace_data})
-    end
-    return
-  end
-  vim.fn.feedkeys(vim.api.nvim_replace_termcodes(test_mappings.play_recording_shortcut, true, true, true), "n")
 end
 
 local sock_waiters = {}
@@ -247,7 +223,7 @@ end
 local function task_cb (task)
   curr_task = task
   local buf = task.strategy.term.bufnr
-  vim.keymap.set("t", test_mappings.play_recording_shortcut, maybe_play_recording, {buffer = buf})
+  vim.keymap.set("t", test_mappings.play_recording_shortcut, M.maybe_play_recording, {buffer = buf})
   vim.keymap.set("t", test_mappings.exit_test, function () M.abort_curr_task() end, {buffer = buf})
   vim.keymap.set("t", test_mappings.restart_test, function () M.restart() end, {buffer = buf})
   vim.keymap.set("t", test_mappings.blank_test, function () M.blank_sess() end, {buffer = buf})
@@ -270,7 +246,7 @@ vim.api.nvim_create_autocmd("User", {
         vim.fn.setreg(reg_override, vim.api.nvim_replace_termcodes(sess_data.recording, true, true, true), "c")
         require"recorder".setRegOverride(reg_override)
         if trace_playback then
-          run_child_notify("require'nvim-task.config'.calltrace_start()")
+          run_child("require'nvim-task.config'.calltrace_start()")
         end
       end
     end
@@ -439,6 +415,35 @@ local function make_test(test)
   print("wrote", test_filepath)
 end
 
+function M.maybe_play_recording()
+  if finished_playback_restart then
+    M.restart()
+    return
+  end
+  if finished_playback then
+    print(("restart test or press '%s' again to replay"):format(test_mappings.play_recording_shortcut))
+    finished_playback_restart = true
+    if trace_playback then
+      trace_playback = false
+      local calltrace_data = run_child("return require'nvim-task.config'.calltrace_end()")
+      set_test_data(curr_test, {calltrace = calltrace_data})
+      make_test(curr_test)
+    end
+    return
+  end
+  local sess_data = curr_test_data()
+  if sess_data and vim.fn.reg_recording() == "" and sess_data.recording then
+    finished_playback = require"recorder".playRecording()
+    if finished_playback and trace_playback then
+      print(("playback finished, press '%s' again to capture trace"):format(test_mappings.play_recording_shortcut))
+    else
+      print(("playback finished"):format(test_mappings.play_recording_shortcut))
+    end
+    return
+  end
+  vim.fn.feedkeys(vim.api.nvim_replace_termcodes(test_mappings.play_recording_shortcut, true, true, true), "n")
+end
+
 vim.api.nvim_create_autocmd("User", {
   pattern = "NvimRecorderRecordEnd",
   callback = function (data)
@@ -455,8 +460,6 @@ vim.api.nvim_create_autocmd("User", {
 
           set_curr_test(name)
           set_test_data(curr_test, {sess = name, recording = vim.fn.keytrans(data.data.recording)})
-
-          make_test(name)
         end
       end)
     end
@@ -530,7 +533,7 @@ local function modfn_picker(title, attach_mappings)
   local pickers = require "telescope.pickers"
   local conf = require("telescope.config").values
 
-  local results = run_child(("return require'nvim-task.config'.get_traceable_fns()"))
+  local results = run_child("return require'nvim-task.config'.get_traceable_fns()")
 
   if vim.tbl_isempty(results) then
     vim.notify("No traceable functions", vim.log.levels.WARN)
@@ -684,14 +687,12 @@ function M.restart_trace()
   end, function() end)
 end
 
-local function _find(picker)
-end
-
 function M.pick_trace()
   a.run(function()
     _restart_trace()
     local traced_calls = _trace_picker_toplevel(curr_test_data().traced_calls)
-    print('DBG[1]: init.lua:693: traced_calls=' .. vim.inspect(traced_calls))
+    run_child("return require'nvim-task.config'.add_trace_wrappers(...)", nvt_conf.get_whitelist(traced_calls))
+    curr_task.strategy.term:open()
   end, function() end)
 end
 

@@ -54,9 +54,10 @@ require("rooter")
 local keymap_orig = vim.keymap.set
 vim.keymap.set = function(mode, lhs, rhs, opts)
   if type(rhs) == "function" then
-    keymap_orig(mode, lhs, function (...)
-      local nvt_mapping = lhs -- used to set 'mapping' field in toplevel callobjs
-      return rhs(...)
+    keymap_orig(mode, lhs, function ()
+      local nvt_mapping = lhs
+      local ret = rhs()
+      return ret
     end, opts)
   else
     keymap_orig(mode, lhs, rhs, opts)
@@ -227,7 +228,7 @@ vim.keymap.set("n", "<leader>v", function ()
   end
 end)
 
-vim.o.shada = "!,'1000,<1000,s10,h"
+vim.o.shada = "!,'10000,<1000,s10,h,rterm:,rlean:"
 
 vim.cmd([[
   autocmd FileType lean3 set shiftwidth=2

@@ -88,10 +88,15 @@ local function _foreach_modfn(modname, submodnames, mod, seen_mods, wl, cb)
   end
 end
 
+local blacklist = {
+  ["_G"] = true,
+  ["vim.shared"] = true
+}
+
 function M.foreach_modfn(cb, wl)
   for modname, module in pairs(package.loaded) do
     local seen_mods = {}
-    if type(module) == "table" and modname ~= "package" and modname ~= "_G" then
+    if type(module) == "table" and modname ~= "package" and not blacklist[modname] then
       -- TODO handle metatable (and __index field in particular)
       local this_wl = wl
       if type(wl) == "table" then
@@ -215,7 +220,6 @@ function M.calltrace_end()
   local curr_objs = call_objs
   call_objs = {}
   M.patch(curr_objs)
-  -- print('DBG[1]: config.lua:254: curr_objs=' .. vim.inspect(curr_objs))
   -- has_fn(curr_objs)
   -- vim.fn.json_encode(curr_objs)
   return curr_objs
@@ -331,11 +335,10 @@ local _pack = function(...) return { n = _select("#", ...), ... } end
 -- local submodstring = function(modname, submodnames)
 --   return modname .. "." .. vim.fn.join(submodnames, ".")
 -- end
-local traced_calls = {
-  ["alternate.test"] = {["vim._editor.api.nvim_list_wins"] = true}
-}
+local traced_calls = nil
 
-local function find_parent_fn(vari, varname, cb)
+local function find_parent_fn(varname, _vari,  cb)
+  local vari = _vari or 1
   local parent_i = 3
   while true do
     if not debug.getinfo(parent_i) then break end
@@ -344,7 +347,11 @@ local function find_parent_fn(vari, varname, cb)
       cb(n, v)
       break
     end
-    parent_i = parent_i + 1
+    if not _vari and n then
+      vari = vari + 1
+    else
+      parent_i = parent_i + 1
+    end
   end
 end
 
@@ -357,7 +364,7 @@ local function trace_wrap(modname, submodnames, mod, fnname, fn)
     local call_obj = {module = modname, submodules = submodnames, func = fnname, key = key, args = args, called = {}}
 
     local toplevel = traced_calls[key] ~= nil
-    find_parent_fn(2, "call_obj", function(_, v)
+    find_parent_fn("call_obj", 2, function(_, v)
       if traced_calls[v.key] and traced_calls[v.key][key] then
         toplevel = false
         table.insert(v.called, call_obj)
@@ -373,7 +380,7 @@ local function trace_wrap(modname, submodnames, mod, fnname, fn)
     disable = true
 
     if toplevel then
-      find_parent_fn(1, "nvt_mapping", function(_, v)
+      find_parent_fn("nvt_mapping", nil, function(_, v)
         call_obj.mapping = vim.fn.keytrans(vim.api.nvim_replace_termcodes(v, true, true, true))
       end)
       table.insert(call_objs, call_obj)
@@ -403,36 +410,39 @@ local function extend_wl_fn(whitelist, modname, submodnames, fnname)
   wl[fnname] = true
 end
 
-function M.set_traced_calls(traced_calls_raw)
+function M.get_whitelist(traced_calls_raw)
   local whitelist = {}
+  local new_traced_calls = {}
   for toplevel, traceds in pairs(traced_calls_raw) do
     extend_wl_fn(whitelist, toplevel.modname, toplevel.submodnames, toplevel.fnname)
     local key = M.modfun_key(toplevel.modname, toplevel.submodnames, toplevel.fnname)
     for traced, _ in pairs(traceds) do
-      traced_calls[key] = traced_calls[key] or {}
-      traced_calls[key][M.modfun_key(traced.modname, traced.submodnames, traced.fnname)] = true
+      new_traced_calls[key] = new_traced_calls[key] or {}
+      new_traced_calls[key][M.modfun_key(traced.modname, traced.submodnames, traced.fnname)] = true
       extend_wl_fn(whitelist, traced.modname, traced.submodnames, traced.fnname)
     end
   end
-
-  disable = true
-  M.foreach_modfn(trace_wrap, whitelist)
-  disable = false
+  return whitelist, new_traced_calls
 end
 
-M.set_traced_calls({
-  [{
-    modname = "alternate",
-    submodnames = {},
-    fnname = "test"
-  }] = {
-    [{
-      modname = "vim._editor",
-      submodnames = {"api"},
-      fnname = "nvim_list_wins"
-    }] = true
-  }
-})
+function M.add_trace_wrappers(whitelist, new_traced_calls)
+  traced_calls = new_traced_calls
+  M.foreach_modfn(trace_wrap, whitelist)
+end
+
+-- M.add_trace_wrappers(M.get_whitelist({
+--   [{
+--     modname = "alternate",
+--     submodnames = {},
+--     fnname = "test"
+--   }] = {
+--       [{
+--         modname = "vim._editor",
+--         submodnames = {"api"},
+--         fnname = "nvim_list_wins"
+--       }] = true
+--     }
+-- }))
 
 vim.keymap.set(
   { "n", "o", "x" },
@@ -441,7 +451,7 @@ vim.keymap.set(
     -- local tbl = vim.F.pack_len("a", nil, "c")
     -- vim.F.unpack_len(tbl)
     require('alternate').test()
-    print"HERE"
+    print"HERE !"
   end
 )
 
