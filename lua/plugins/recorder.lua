@@ -1,6 +1,6 @@
 return {
 	"chrisgrieser/nvim-recorder",
-  -- enabled = false,
+  enabled = false,
 	dependencies = "rcarriga/nvim-notify", -- optional
 	opts = {
     slots = { "a", "b" },

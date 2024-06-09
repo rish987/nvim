@@ -124,8 +124,10 @@ end
 
 if not vim.g.StartedByNvimTask then return M end
 
+local sockfile = vim.g.NvimTaskChildSockfile
+
 local parent_sock = vim.fn.sockconnect("pipe", vim.g.NvimTaskParentSock, {rpc = true})
-vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'nvim-task'.set_child_sock()", {})
+vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {sockfile})
 
 vim.o.swapfile = false
 
@@ -178,15 +180,10 @@ vim.api.nvim_create_autocmd("VimEnter", {
 
 -- resession-generic
 
-local abort_temp_save = false
-
-function M.abort_temp_save()
-  abort_temp_save = true
-end
 
 vim.api.nvim_create_autocmd("VimLeavePre", {
   callback = function()
-    if sess == M.temp_test_name and not abort_temp_save then -- auto-save temporary session
+    if sess == M.temp_test_name then -- auto-save temporary session
       require"resession".save(sess, { dir = sessiondir, notify = false })
     end
   end,
