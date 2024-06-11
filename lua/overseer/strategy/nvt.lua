@@ -1,7 +1,7 @@
 local jobs = require("overseer.strategy._jobs")
 local tts = require("overseer.strategy.toggleterm")
 local shell = require("overseer.shell")
-local db = require("overseer.db")
+local db = require("nvim-task.db")
 local nvt_conf = require("nvim-task.config")
 local trace = require("nvim-task.trace")
 
@@ -10,13 +10,15 @@ local terminal = require("toggleterm.terminal")
 local a = require"plenary.async"
 local a_util = require"plenary.async.util"
 
+local task_stack = {}
+
 local function _wait_for_autocmd(cmds, callback)
 	vim.api.nvim_create_autocmd(cmds, { callback = callback, once = true })
 end
 
 local wait_for_autocmd = a.wrap(_wait_for_autocmd, 2)
 
-local socknames_to_strats = {}
+local sockfiles_to_strats = {}
 
 local NVTStrategy = {}
 
@@ -35,6 +37,8 @@ end
 local play_recording_shortcut = vim.g.StartedByNvimTask and "<C-tab>" or "<tab>"
 local startstop_recording = vim.g.StartedByNvimTask and "<C-A-f>" or "<C-f>"
 local breakpoint_key = vim.g.StartedByNvimTask and "<C-A-e>" or "<C-e>"
+local restart_key = vim.g.StartedByNvimTask and "<C-A-x>r" or "<C-x>r"
+local abort_key = vim.g.StartedByNvimTask and "<C-A-x>x" or "<C-x>x"
 
 local normalizeKeycodes = function(mapping)
 	return vim.fn.keytrans(vim.api.nvim_replace_termcodes(mapping, true, true, true))
@@ -42,26 +46,34 @@ end
 
 function NVTStrategy.new(opts)
   local new = tts.new(opts)
-  setmetatable(tts, {__index = NVTStrategy})
 
   local data = opts.data
-  -- TODO the recording should come pre-split by the nvim-task.recorder module
-  local rem_recording = split(data.recording, normalizeKeycodes(breakpoint_key))
+  local split_recording = data.recording and split(data.recording, normalizeKeycodes(breakpoint_key))
 
   local to_merge = {
     data = data,
-    rem_recording = rem_recording,
+    split_recording = split_recording,
     sock_waiters = {},
-    name = data.sess
+    sname = data.sess
   }
   new = vim.tbl_extend("error", new, to_merge)
+  setmetatable(new, {__index = NVTStrategy})
 
-  socknames_to_strats[opts.sockname] = new
+  sockfiles_to_strats[opts.sockfile] = new
   return new
+end
+
+function NVTStrategy:_reset()
+  -- TODO the recording should come pre-split by the nvim-task.recorder module
+  self.rem_recording = vim.fn.copy(self.split_recording)
+  self.finished_playback = false
+  self.finished_playback_restart = false
 end
 
 function NVTStrategy:reset()
   tts.reset(self)
+
+  self:_reset()
 end
 
 function NVTStrategy:get_bufnr()
@@ -69,11 +81,25 @@ function NVTStrategy:get_bufnr()
 end
 
 function NVTStrategy:restart()
-  print("FIXME implement restart")
+  -- FIXME this is a workaround for:
+  -- require"overseer".run_action(self.task, "restart")
+  -- since we need to wait for the toggleterm to properly close
+  -- so as to avoid the issue where it opens in normal mode
+  self.task:stop()
+  self.task:reset()
+
+  vim.defer_fn(function()
+    self.task:start()
+  end, self.term:is_open() and 100 or 0)
+end
+
+function NVTStrategy:abort()
+  self.task:stop()
+  self.task:dispose()
 end
 
 function NVTStrategy.set_child_sock(sockfile)
-  local self = socknames_to_strats[sockfile]
+  local self = sockfiles_to_strats[sockfile]
   if not self then return end
 
   self.sock = vim.fn.sockconnect("pipe", sockfile, {rpc = true})
@@ -116,11 +142,11 @@ end
 local tempreg = "t"
 
 function NVTStrategy:set_data(data)
-  db.set_test_data(self.name, data)
+  db.set_test_data(self.sname, data)
 end
 
 function NVTStrategy:get_win()
-  local win = self.strategy.term.window
+  local win = self.term.window
   -- the session may currently be un-toggled
   if not vim.api.nvim_win_is_valid(win) then return nil end
 
@@ -129,7 +155,7 @@ end
 
 -- TODO add a way to auto-pause recording when terminal mode/window is left,
 -- and auto-restart (with a notification) after re-entering
-function NVTStrategy:record_toggle()
+function NVTStrategy:_record_toggle()
 	if not isRecording() then
 		-- NOTE: above autocmd may have set regOverride
 		a_normal("q" .. tempreg)
@@ -146,16 +172,25 @@ function NVTStrategy:record_toggle()
     if name then
       local get_session_file = require"resession.util".get_session_file
       local saved_file = get_session_file(nvt_conf.saved_test_name, db.sessiondir)
-      local new_file = get_session_file(name, self.opts.sessiondir) -- name the session after the test
+      local new_file = get_session_file(name, db.sessiondir) -- name the session after the test
       -- TODO check and confirm override if name/session already exists
       print("renaming session:", saved_file, new_file)
       vim.loop.fs_rename(saved_file, new_file)
       self:run_child_notify(("require'nvim-task.config'.record_finish(%s)"):format(name))
-      self.name = name
+      self.sname = name
 
       self:set_data({sess = name, recording = vim.fn.keytrans(recording)})
+
+      self.finished_playback_restart = true
+      print(("press '%s' to restart"):format(play_recording_shortcut))
     end
   end)
+end
+
+function NVTStrategy:record_toggle()
+  a.run(function()
+    self:_record_toggle()
+  end, function() end)
 end
 
 function NVTStrategy:run_child(code, ...)
@@ -169,7 +204,10 @@ function NVTStrategy:run_child_notify(code, ...)
 end
 
 function NVTStrategy:play_recording()
-  if #self.rem_recording == 0 then return end
+  if #self.rem_recording == 0 then
+    print("no recording to play!")
+    return
+  end
 
   if self.trace_playback and not self.already_tracing then
     self:run_child("require'nvim-task.config'.calltrace_start()")
@@ -198,7 +236,7 @@ function NVTStrategy:maybe_play_recording()
       -- make_test(curr_test)
     end
 
-    print(("press '%s' again to replay"):format(play_recording_shortcut))
+    print(("press '%s' again to restart"):format(play_recording_shortcut))
     return
   end
 
@@ -239,10 +277,16 @@ function NVTStrategy:start(task)
   tts.start(self, task)
   -- TODO check that task.cmd string starts with `nvim`
 
-  local buf = task.strategy.term.bufnr
+  self:_reset()
+
+  local buf = self.term.bufnr
+  self.task = task
+  table.insert(task_stack, task)
   vim.keymap.set("t", play_recording_shortcut, function() self:maybe_play_recording() end, {buffer = buf})
   vim.keymap.set("t", startstop_recording, function() self:record_toggle() end, {buffer = buf})
   vim.keymap.set("t", breakpoint_key, function() self:addBreakPoint(breakpoint_key) end, {buffer = buf})
+  vim.keymap.set("t", restart_key, function() self:restart() end, {buffer = buf})
+  vim.keymap.set("t", abort_key, function() self:abort() end, {buffer = buf})
   -- vim.keymap.set("t", self.opts.exit_test, function () M.abort_curr_task() end, {buffer = buf})
   -- vim.keymap.set("t", self.opts.restart_test, function () M.restart() end, {buffer = buf})
   -- vim.keymap.set("t", self.opts.blank_test, function () M.blank_sess() end, {buffer = buf})
@@ -250,13 +294,47 @@ function NVTStrategy:start(task)
   -- vim.keymap.set("t", self.opts.trace_test, function () M.restart_trace() end, {buffer = buf})
 end
 
+function NVTStrategy.get_task_stack()
+  return task_stack
+end
+
+function NVTStrategy.last_task()
+  return task_stack[#task_stack]
+end
+
+function NVTStrategy.abort_last_task()
+  local task = NVTStrategy.last_task()
+  if task then
+    task:stop()
+    return
+  end
+  print(('no tasks currently running'))
+end
+
+function NVTStrategy.restart_last_task()
+  local task = NVTStrategy.last_task()
+  if task then
+    task.strategy:restart()
+    print(('restarted task "%s"'):format(task.strategy.sname))
+    return
+  end
+  print(('no tasks currently running'))
+end
+
 function NVTStrategy:stop()
+  for i, _ in ipairs(task_stack) do
+    if task_stack[i] == self.task then
+      table.remove(task_stack, i)
+      break
+    end
+  end
+  self.term:close()
   tts.stop(self)
+  print(('aborted task "%s"'):format(self.sname))
 end
 
 function NVTStrategy:dispose()
   tts.dispose(self)
-  self.strategy.term:close()
 end
 
 return NVTStrategy

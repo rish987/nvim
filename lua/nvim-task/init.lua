@@ -41,25 +41,14 @@ if not curr_test then
   curr_test = nvt_conf.temp_test_name
   db.set_test_metadata({curr_test = curr_test})
 end
-local curr_task
 
 local a = require"plenary.async"
+local strat = require"overseer.strategy.nvt"
 
 
 local function set_curr_test(test)
   curr_test = test
   db.set_test_metadata({curr_test = curr_test})
-end
-
-M.abort_curr_task = function ()
-  if curr_task then
-    -- vim.fn.chanclose(curr_task.sock)
-    curr_task:dispose()
-    curr_task = nil
-
-    return true
-  end
-  return false
 end
 
 local test_leader = vim.g.StartedByNvimTask and "<C-A-x>" or "<C-x>"
@@ -78,9 +67,7 @@ local test_mappings = {
 -- TODO status line indicator for current recording and keymap to clear recording
 
 local function task_cb (task)
-  curr_task = task
   local buf = task.strategy.term.bufnr
-  vim.keymap.set("t", test_mappings.exit_test, function () M.abort_curr_task() end, {buffer = buf})
   -- vim.keymap.set("t", test_mappings.restart_test, function () M.restart() end, {buffer = buf})
   -- vim.keymap.set("t", test_mappings.blank_test, function () M.blank_sess() end, {buffer = buf})
   -- vim.keymap.set("t", test_mappings.edit_test, function () M.abort_curr_task(function () M.edit_curr_test() end) end, {buffer = buf})
@@ -110,8 +97,7 @@ local function _new_nvt(test)
   print("loading test:", test)
   set_curr_test(test)
 
-  local task = _run_template({name = "nvt", params = {data = db.get_tests_data()[test]}})
-  task_cb(task)
+  require"overseer".run_template({name = "nvt", params = {data = db.get_tests_data()[test]}}, task_cb)
   -- _wait_sock()
 end
 
@@ -186,11 +172,19 @@ end
 
 -- vim.keymap.set("n", "<leader>W", M.save_restart)
 -- vim.keymap.set("n", test_mappings.restart_test, M.restart)
-vim.keymap.set("n", test_mappings.exit_test, M.abort_curr_task)
+vim.keymap.set("n", test_mappings.exit_test, strat.abort_last_task)
 vim.keymap.set("n", test_mappings.find_test, M.pick_test)
 vim.keymap.set("n", test_mappings.blank_test, M.blank_sess)
 vim.keymap.set("n", test_mappings.edit_test, M.edit_curr_test)
-vim.keymap.set("n", test_mappings.trace_picker, M.pick_trace)
+-- vim.keymap.set("n", test_mappings.trace_picker, M.pick_trace)
+M.restart = function()
+  if strat.last_task() then
+    strat.restart_last_task()
+  else
+    new_nvim_task()
+  end
+end
+vim.keymap.set("n", test_mappings.restart_test, M.restart)
 
 return M
 
