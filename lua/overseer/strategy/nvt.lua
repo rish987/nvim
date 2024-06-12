@@ -22,17 +22,6 @@ local sockfiles_to_strats = {}
 
 local NVTStrategy = {}
 
-local function split(inputstr, sep)
-  if sep == nil then
-    sep = "%s"
-  end
-  local t = {}
-  for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
-    table.insert(t, str)
-  end
-  return t
-end
-
 -- TODO make configurable
 local play_recording_shortcut = vim.g.StartedByNvimTask and "<C-tab>" or "<tab>"
 local startstop_recording = vim.g.StartedByNvimTask and "<C-A-f>" or "<C-f>"
@@ -48,7 +37,7 @@ function NVTStrategy.new(opts)
   local new = tts.new(opts)
 
   local data = opts.data
-  local split_recording = data.recording and split(data.recording, normalizeKeycodes(breakpoint_key))
+  local split_recording = data.recording and vim.split(data.recording, normalizeKeycodes(breakpoint_key), {plain = true}) or {}
 
   local to_merge = {
     data = data,
@@ -142,7 +131,7 @@ end
 local tempreg = "t"
 
 function NVTStrategy:set_data(data)
-  db.set_test_data(self.sname, data)
+  self.data = db.set_test_data(self.sname, data)
 end
 
 function NVTStrategy:get_win()
@@ -152,6 +141,8 @@ function NVTStrategy:get_win()
 
   return win
 end
+
+local _input = a.wrap(vim.ui.input, 2)
 
 -- TODO add a way to auto-pause recording when terminal mode/window is left,
 -- and auto-restart (with a notification) after re-entering
@@ -166,25 +157,29 @@ function NVTStrategy:_record_toggle()
 
 	a_normal("q")
 
-  local recording = getMacro(tempreg)
+	local decodedToggleKey = vim.api.nvim_replace_termcodes(startstop_recording, true, true, true)
+  -- FIXME only replace termcodes in parts that were actually changed by keytrans (to handle edge case where "<...>" is entered in insert mode)
+	local norm_macro = vim.api.nvim_replace_termcodes(vim.fn.keytrans(getMacro(tempreg)), true, true, true)
+	local recording = norm_macro:sub(1, -1 * (#decodedToggleKey + 1))
 
-  vim.ui.input({ prompt = "Test name (empty to override): " }, function(name)
-    if name then
-      local get_session_file = require"resession.util".get_session_file
-      local saved_file = get_session_file(nvt_conf.saved_test_name, db.sessiondir)
-      local new_file = get_session_file(name, db.sessiondir) -- name the session after the test
-      -- TODO check and confirm override if name/session already exists
-      print("renaming session:", saved_file, new_file)
-      vim.loop.fs_rename(saved_file, new_file)
-      self:run_child_notify(("require'nvim-task.config'.record_finish(%s)"):format(name))
-      self.sname = name
+  local _name = _input({ prompt = "Test name (empty to override): " })
+  local name = _name == "" and self.sname or _name
 
-      self:set_data({sess = name, recording = vim.fn.keytrans(recording)})
+  if name then
+    local get_session_file = require"resession.util".get_session_file
+    local saved_file = get_session_file(nvt_conf.saved_test_name, db.sessiondir)
+    local new_file = get_session_file(name, db.sessiondir) -- name the session after the test
+    -- TODO check and confirm override if name/session already exists
+    print("renaming session:", saved_file, new_file)
+    vim.loop.fs_rename(saved_file, new_file)
+    self:run_child_notify(("require'nvim-task.config'.record_finish(%s)"):format(name))
+    self.sname = name
 
-      self.finished_playback_restart = true
-      print(("press '%s' to restart"):format(play_recording_shortcut))
-    end
-  end)
+    self:set_data({sess = name, recording = vim.fn.keytrans(recording)})
+
+    self.finished_playback_restart = true
+    print(("press '%s' to restart"):format(play_recording_shortcut))
+  end
 end
 
 function NVTStrategy:record_toggle()
@@ -217,12 +212,17 @@ function NVTStrategy:play_recording()
   local keys = self.rem_recording[1]
   table.remove(self.rem_recording, 1)
 
-  vim.api.nvim_chan_send(self.chan_id, vim.api.nvim_replace_termcodes(keys, true, true, true))
+  self:run_child("vim.fn.feedkeys(vim.api.nvim_replace_termcodes(..., true, true, true))", keys)
+  -- local to_send = vim.api.nvim_replace_termcodes(keys, true, true, true)
+  -- vim.fn.chansend(self.chan_id, to_send)
+  -- vim.fn.feedkeys(to_send)
 
-  return #self.rem_recording == 1
+  return #self.rem_recording == 0
 end
 
 function NVTStrategy:maybe_play_recording()
+  if isRecording() then goto feed end
+
   if self.finished_playback_restart then
     self:restart()
     return
@@ -242,16 +242,20 @@ function NVTStrategy:maybe_play_recording()
 
   if self.rem_recording and #self.rem_recording > 0 then
     self.finished_playback = self:play_recording()
-    if self.finished_playback and self.trace_playback then
-      print(("playback finished, press '%s' again to capture trace"):format(play_recording_shortcut))
+    if self.finished_playback then
+      if self.trace_playback then
+        print(("playback finished, press '%s' again to capture trace"):format(play_recording_shortcut))
+      else
+        print("playback finished")
+      end
     else
-      print("playback finished")
+      print(("hit breakpoint (%d remaining)"):format(#self.rem_recording))
     end
     return
   end
 
-  local raw = vim.api.nvim_replace_termcodes(play_recording_shortcut, true, true, true)
-  vim.api.nvim_chan_send(self.chan_id, raw)
+  ::feed::
+  self:run_child("vim.fn.feedkeys(vim.api.nvim_replace_termcodes(..., true, true, true))", play_recording_shortcut)
 end
 
 function NVTStrategy:addBreakPoint(key)

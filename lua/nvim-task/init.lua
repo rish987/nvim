@@ -93,11 +93,28 @@ local _run_template = a.wrap(require"overseer".run_template, 2)
 
 local function _new_nvt(test)
   if not test then test = curr_test end
+  local data
 
-  print("loading test:", test)
+  if test == "" then
+    print("loading blank test")
+    data = {sess = ""}
+    test = nvt_conf.temp_test_name
+  else
+    data = db.get_tests_data()[test]
+    if data then
+      print("loading test:", test)
+    else
+      if test ~= nvt_conf.temp_test_name then
+        print(("WARNING: test '%s' not found; defaulting to auto-saved test session"):format(test, nvt_conf.temp_test_name))
+      else
+        print("loading auto-saved test session")
+      end
+      data = {sess = nvt_conf.temp_test_name}
+    end
+  end
+
   set_curr_test(test)
-
-  require"overseer".run_template({name = "nvt", params = {data = db.get_tests_data()[test]}}, task_cb)
+  require"overseer".run_template({name = "nvt", params = {data = data}}, task_cb)
   -- _wait_sock()
 end
 
@@ -162,15 +179,9 @@ function M.pick_test()
 end
 
 function M.blank_sess()
-  if nvt_conf.session_exists(nvt_conf.temp_test_name, db.sessiondir) then
-    require"resession".delete(nvt_conf.temp_test_name, { dir = db.sessiondir })
-    db.del_test_data(nvt_conf.temp_test_name)
-  end
-
-  new_nvim_task(nvt_conf.temp_test_name)
+  new_nvim_task("")
 end
 
--- vim.keymap.set("n", "<leader>W", M.save_restart)
 -- vim.keymap.set("n", test_mappings.restart_test, M.restart)
 vim.keymap.set("n", test_mappings.exit_test, strat.abort_last_task)
 vim.keymap.set("n", test_mappings.find_test, M.pick_test)
@@ -185,6 +196,11 @@ M.restart = function()
   end
 end
 vim.keymap.set("n", test_mappings.restart_test, M.restart)
+M.save_restart = function()
+  vim.cmd.write()
+  M.restart()
+end
+vim.keymap.set("n", "<leader>W", M.save_restart)
 
 return M
 

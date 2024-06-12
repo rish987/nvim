@@ -25,6 +25,8 @@ function M.set_test_data(test, value)
 
   local json = vim.fn.json_encode(tests_data)
   vim.fn.writefile({json}, M.data_file)
+
+  return curr_data
 end
 
 function M.set_test_metadata(value)
