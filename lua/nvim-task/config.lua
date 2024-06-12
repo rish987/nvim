@@ -127,7 +127,6 @@ if not vim.g.StartedByNvimTask then return M end
 local sockfile = vim.g.NvimTaskChildSockfile
 
 local parent_sock = vim.fn.sockconnect("pipe", vim.g.NvimTaskParentSock, {rpc = true})
-vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {sockfile})
 
 vim.o.swapfile = false
 
@@ -147,7 +146,7 @@ end)
 
 local sessiondir = vim.g.NvimTaskSessionDir
 
-local sess = vim.g.NvimTaskSess
+local sess
 
 function M.save_session () -- save to default slot
   -- FIXME do this without setting any "state" w.r.t the current session
@@ -161,14 +160,20 @@ end
 
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = vim.schedule_wrap(function()
-    if M.session_exists(sess, sessiondir) then
-      require"resession".load(sess, { dir = sessiondir, silence_errors = true })
-    else
-      sess = M.temp_test_name
-    end
-    M.msgview_enable()
+    vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "return require'overseer.strategy.nvt'.set_child_sock(...)", {sockfile})
+    -- now, wait for M.load_session to be called by the parent instance (after it has connected)
   end),
 })
+
+function M.load_session(_sess)
+  sess = _sess
+  if M.session_exists(sess, sessiondir) then
+    require"resession".load(sess, { dir = sessiondir, silence_errors = true })
+  else
+    sess = M.temp_test_name
+  end
+  M.msgview_enable()
+end
 
 -- vim.keymap.set("n", "<leader>Xn", function ()
 --   vim.fn.feedkeys(keymap_str:format("n"))

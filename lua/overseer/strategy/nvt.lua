@@ -36,14 +36,9 @@ end
 function NVTStrategy.new(opts)
   local new = tts.new(opts)
 
-  local data = opts.data
-  local split_recording = data.recording and vim.split(data.recording, normalizeKeycodes(breakpoint_key), {plain = true}) or {}
-
   local to_merge = {
-    data = data,
-    split_recording = split_recording,
     sock_waiters = {},
-    sname = data.sess
+    sname = opts.sname
   }
   new = vim.tbl_extend("error", new, to_merge)
   setmetatable(new, {__index = NVTStrategy})
@@ -53,6 +48,9 @@ function NVTStrategy.new(opts)
 end
 
 function NVTStrategy:_reset()
+  self.sock = nil
+  self.data = db.get_tests_data()[self.sname] or {sess = self.sname}
+  self.split_recording = self.data.recording and vim.split(self.data.recording, normalizeKeycodes(breakpoint_key), {plain = true}) or {}
   -- TODO the recording should come pre-split by the nvim-task.recorder module
   self.rem_recording = vim.fn.copy(self.split_recording)
   self.finished_playback = false
@@ -92,6 +90,8 @@ function NVTStrategy.set_child_sock(sockfile)
   if not self then return end
 
   self.sock = vim.fn.sockconnect("pipe", sockfile, {rpc = true})
+
+  self:run_child_notify("require'nvim-task.config'.load_session(...)", self.sname)
   -- for _, cb in ipairs(self.sock_waiters) do
   --   cb(self.sock)
   -- end
@@ -162,8 +162,10 @@ function NVTStrategy:_record_toggle()
 	local norm_macro = vim.api.nvim_replace_termcodes(vim.fn.keytrans(getMacro(tempreg)), true, true, true)
 	local recording = norm_macro:sub(1, -1 * (#decodedToggleKey + 1))
 
-  local _name = _input({ prompt = "Test name (empty to override): " })
-  local name = _name == "" and self.sname or _name
+  local name = self.sname
+  if name == require"nvim-task.config".temp_test_name then
+    name = _input({ prompt = "Test name: " })
+  end
 
   if name then
     local get_session_file = require"resession.util".get_session_file
@@ -194,7 +196,7 @@ function NVTStrategy:run_child(code, ...)
 end
 
 function NVTStrategy:run_child_notify(code, ...)
-  if not self.sock then return end
+  if not self.sock then print"ERROR: sock not set yet" return end
   vim.fn.rpcnotify(self.sock, "nvim_exec_lua", code, {...})
 end
 
@@ -278,10 +280,10 @@ function NVTStrategy:pick_trace()
 end
 
 function NVTStrategy:start(task)
+  self:_reset()
+
   tts.start(self, task)
   -- TODO check that task.cmd string starts with `nvim`
-
-  self:_reset()
 
   local buf = self.term.bufnr
   self.task = task
@@ -291,6 +293,8 @@ function NVTStrategy:start(task)
   vim.keymap.set("t", breakpoint_key, function() self:addBreakPoint(breakpoint_key) end, {buffer = buf})
   vim.keymap.set("t", restart_key, function() self:restart() end, {buffer = buf})
   vim.keymap.set("t", abort_key, function() self:abort() end, {buffer = buf})
+
+  db.set_test_metadata({curr_test = self.sname})
   -- vim.keymap.set("t", self.opts.exit_test, function () M.abort_curr_task() end, {buffer = buf})
   -- vim.keymap.set("t", self.opts.restart_test, function () M.restart() end, {buffer = buf})
   -- vim.keymap.set("t", self.opts.blank_test, function () M.blank_sess() end, {buffer = buf})

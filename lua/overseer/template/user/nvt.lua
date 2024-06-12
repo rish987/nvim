@@ -16,19 +16,17 @@ end
 return {
   name = "nvt",
   builder = function(params)
-    local data = params.data or {sess = nvt_conf.temp_test_name}
     local sockfile = get_child_sock()
     return {
       cmd = { "nvim" },
       args = {
         "--cmd", 'let g:StartedByNvimTask = "true"',
         "--cmd", ('let g:NvimTaskSessionDir = "%s"'):format(db.sessiondir), -- use parent sessiondir
-        "--cmd", ('let g:NvimTaskSess = "%s"'):format(data.sess),
         "--cmd", ('let g:NvimTaskParentSock = "%s"'):format(sock),
         "--cmd", ('let g:NvimTaskChildSockfile = "%s"'):format(sockfile),
         "--listen", sockfile
       },
-      strategy = {"nvt", data = data, sockfile = sockfile},
+      strategy = {"nvt", sname = params.sname, sockfile = sockfile},
       components = {
         "default",
       },
