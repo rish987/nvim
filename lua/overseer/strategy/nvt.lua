@@ -57,6 +57,16 @@ function NVTStrategy:_reset()
   self.finished_playback_restart = false
 end
 
+function NVTStrategy:run_child(code, ...)
+  if not self.sock then return end
+  return vim.fn.rpcrequest(self.sock, "nvim_exec_lua", code, {...})
+end
+
+function NVTStrategy:run_child_notify(code, ...)
+  if not self.sock then print"ERROR: sock not set yet" return end
+  vim.fn.rpcnotify(self.sock, "nvim_exec_lua", code, {...})
+end
+
 function NVTStrategy:reset()
   tts.reset(self)
 
@@ -72,12 +82,14 @@ function NVTStrategy:restart()
   -- require"overseer".run_action(self.task, "restart")
   -- since we need to wait for the toggleterm to properly close
   -- so as to avoid the issue where it opens in normal mode
+  local was_open = self.term:is_open()
+
   self.task:stop()
   self.task:reset()
 
   vim.defer_fn(function()
     self.task:start()
-  end, self.term:is_open() and 100 or 0)
+  end, was_open and 100 or 100)
 end
 
 function NVTStrategy:abort()
@@ -89,7 +101,9 @@ function NVTStrategy.set_child_sock(sockfile)
   local self = sockfiles_to_strats[sockfile]
   if not self then return end
 
+  print('DBG[28]: nvt.lua:101 (after if not self then return end)')
   self.sock = vim.fn.sockconnect("pipe", sockfile, {rpc = true})
+  print('DBG[29]: nvt.lua:103 (after self.sock = vim.fn.sockconnect(pipe, soc…)')
 
   self:run_child_notify("require'nvim-task.config'.load_session(...)", self.sname)
   -- for _, cb in ipairs(self.sock_waiters) do
@@ -190,16 +204,6 @@ function NVTStrategy:record_toggle()
   end, function() end)
 end
 
-function NVTStrategy:run_child(code, ...)
-  if not self.sock then return end
-  return vim.fn.rpcrequest(self.sock, "nvim_exec_lua", code, {...})
-end
-
-function NVTStrategy:run_child_notify(code, ...)
-  if not self.sock then print"ERROR: sock not set yet" return end
-  vim.fn.rpcnotify(self.sock, "nvim_exec_lua", code, {...})
-end
-
 function NVTStrategy:play_recording()
   if #self.rem_recording == 0 then
     print("no recording to play!")
@@ -214,7 +218,7 @@ function NVTStrategy:play_recording()
   local keys = self.rem_recording[1]
   table.remove(self.rem_recording, 1)
 
-  self:run_child("vim.fn.feedkeys(vim.api.nvim_replace_termcodes(..., true, true, true))", keys)
+  self:run_child("vim.api.nvim_input(...)", keys)
   -- local to_send = vim.api.nvim_replace_termcodes(keys, true, true, true)
   -- vim.fn.chansend(self.chan_id, to_send)
   -- vim.fn.feedkeys(to_send)

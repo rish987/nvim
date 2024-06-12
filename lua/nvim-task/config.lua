@@ -160,12 +160,13 @@ end
 
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = vim.schedule_wrap(function()
-    vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "return require'overseer.strategy.nvt'.set_child_sock(...)", {sockfile})
+    vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {sockfile})
     -- now, wait for M.load_session to be called by the parent instance (after it has connected)
   end),
 })
 
 function M.load_session(_sess)
+  print('DBG[20]: config.lua:168 (after function M.load_session(_sess))')
   sess = _sess
   if M.session_exists(sess, sessiondir) then
     require"resession".load(sess, { dir = sessiondir, silence_errors = true })
