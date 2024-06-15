@@ -35,17 +35,8 @@ local db = require "nvim-task.db"
 --
 -- local config_file = script_path() .. get_path_separator() .. "config.lua"
 
-local curr_test = db.get_tests_metadata().curr_test
-
-if not curr_test then
-  curr_test = nvt_conf.temp_test_name
-  db.set_test_metadata({curr_test = curr_test})
-end
-
 local a = require"plenary.async"
 local strat = require"overseer.strategy.nvt"
-
-
 
 local test_leader = vim.g.StartedByNvimTask and "<C-A-x>" or "<C-x>"
 local test_mappings = {
@@ -62,17 +53,8 @@ local test_mappings = {
 
 -- TODO status line indicator for current recording and keymap to clear recording
 
-local function task_cb (task)
-  local buf = task.strategy.term.bufnr
-  -- vim.keymap.set("t", test_mappings.restart_test, function () M.restart() end, {buffer = buf})
-  -- vim.keymap.set("t", test_mappings.blank_test, function () M.blank_sess() end, {buffer = buf})
-  -- vim.keymap.set("t", test_mappings.edit_test, function () M.abort_curr_task(function () M.edit_curr_test() end) end, {buffer = buf})
-  -- vim.keymap.set("t", test_mappings.trace_test, function () M.restart_trace() end, {buffer = buf})
-  -- vim.keymap.set("t", test_mappings.duplicate_test, function () run_child(print"HERE") end, {buffer = buf})
-end
-
-
 function M.edit_curr_test()
+  local curr_test = db.get_tests_metadata().curr_test
   local test_filepath = db.testdir .. ("/%s_spec.lua"):format(curr_test)
 
   if nvt_conf.file_exists(test_filepath) then
@@ -88,6 +70,7 @@ local _run_template = a.wrap(require"overseer".run_template, 2)
 -- end, 1)
 
 local function _new_nvt(sname)
+  local curr_test = db.get_tests_metadata().curr_test
   if not sname then sname = curr_test end
 
   if sname == "" then
@@ -105,7 +88,7 @@ local function _new_nvt(sname)
     end
   end
 
-  require"overseer".run_template({name = "nvt", params = {sname = sname}}, task_cb)
+  require"overseer".run_template({name = "nvt", params = {sname = sname}})
   -- _wait_sock()
 end
 
@@ -141,6 +124,8 @@ function M.test_picker()
   end
 
   local opts = {}
+
+  local curr_test = db.get_tests_metadata().curr_test
 
   return pickers
     .new({}, {
@@ -197,6 +182,17 @@ M.save_restart = function()
   M.restart()
 end
 vim.keymap.set("n", "<leader>W", M.save_restart)
+
+vim.keymap.set(
+  { "n", "o", "x" },
+  "<C-p>",
+  function ()
+    -- local tbl = vim.F.pack_len("a", nil, "c")
+    -- vim.F.unpack_len(tbl)
+    require('alternate').tst()
+    print"HERE !"
+  end
+)
 
 return M
 

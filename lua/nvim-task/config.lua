@@ -165,8 +165,34 @@ vim.api.nvim_create_autocmd("VimEnter", {
   end),
 })
 
+local ns = vim.api.nvim_create_namespace"NvimTask"
+
+vim.ui_attach(ns, {ext_messages = true}, function(event, kind, content, _)
+  if event ~= "msg_show" then return end
+  local is_error =
+    kind == "emsg" or
+    kind == "echoerr" or
+    kind == "lua_error" or
+    kind == "rpc_error"
+
+  if kind == "return_prompt" then
+    vim.api.nvim_input("<cr>")
+    return
+  end
+
+  local str = ""
+  for i, val in ipairs(content) do
+    if i > 1 then
+      str = str .. "\n" .. val[2]
+    else
+      str = str .. val[2]
+    end
+  end
+
+  vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.new_child_msg(...)", {sockfile, str, is_error})
+end)
+
 function M.load_session(_sess)
-  print('DBG[20]: config.lua:168 (after function M.load_session(_sess))')
   sess = _sess
   if M.session_exists(sess, sessiondir) then
     require"resession".load(sess, { dir = sessiondir, silence_errors = true })
@@ -453,7 +479,7 @@ vim.keymap.set(
   function ()
     -- local tbl = vim.F.pack_len("a", nil, "c")
     -- vim.F.unpack_len(tbl)
-    require('alternate').test()
+    require('alternate').tst()
     print"HERE !"
   end
 )

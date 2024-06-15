@@ -28,6 +28,7 @@ return {
       },
       strategy = {"nvt", sname = params.sname, sockfile = sockfile},
       components = {
+        -- "nvt",
         "default",
       },
     }

@@ -1,11 +1,7 @@
-local jobs = require("overseer.strategy._jobs")
 local tts = require("overseer.strategy.toggleterm")
-local shell = require("overseer.shell")
 local db = require("nvim-task.db")
 local nvt_conf = require("nvim-task.config")
 local trace = require("nvim-task.trace")
-
-local terminal = require("toggleterm.terminal")
 
 local a = require"plenary.async"
 local a_util = require"plenary.async.util"
@@ -34,17 +30,20 @@ local normalizeKeycodes = function(mapping)
 end
 
 function NVTStrategy.new(opts)
-  local new = tts.new(opts)
-
-  local to_merge = {
+  local new = {
     sock_waiters = {},
-    sname = opts.sname
+    sname = opts.sname,
+    bufnr = nil,
+    chan_id = nil,
+    opts = opts,
+    term = nil,
   }
-  new = vim.tbl_extend("error", new, to_merge)
-  setmetatable(new, {__index = NVTStrategy})
+
+  -- new = vim.tbl_extend("error", new, to_merge)
+  -- setmetatable(new, {__index = NVTStrategy})
 
   sockfiles_to_strats[opts.sockfile] = new
-  return new
+  return setmetatable(new, { __index = NVTStrategy })
 end
 
 function NVTStrategy:_reset()
@@ -55,6 +54,7 @@ function NVTStrategy:_reset()
   self.rem_recording = vim.fn.copy(self.split_recording)
   self.finished_playback = false
   self.finished_playback_restart = false
+  self.chan_id = nil
 end
 
 function NVTStrategy:run_child(code, ...)
@@ -63,12 +63,12 @@ function NVTStrategy:run_child(code, ...)
 end
 
 function NVTStrategy:run_child_notify(code, ...)
-  if not self.sock then print"ERROR: sock not set yet" return end
+  if not self.sock then vim.notify"ERROR: sock not set yet" return end
   vim.fn.rpcnotify(self.sock, "nvim_exec_lua", code, {...})
 end
 
 function NVTStrategy:reset()
-  tts.reset(self)
+  -- tts.reset(self)
 
   self:_reset()
 end
@@ -82,14 +82,14 @@ function NVTStrategy:restart()
   -- require"overseer".run_action(self.task, "restart")
   -- since we need to wait for the toggleterm to properly close
   -- so as to avoid the issue where it opens in normal mode
-  local was_open = self.term:is_open()
+  local was_open = self:is_open() -- TODO implement
 
   self.task:stop()
   self.task:reset()
 
   vim.defer_fn(function()
     self.task:start()
-  end, was_open and 100 or 100)
+  end, was_open and 100 or 0)
 end
 
 function NVTStrategy:abort()
@@ -101,15 +101,22 @@ function NVTStrategy.set_child_sock(sockfile)
   local self = sockfiles_to_strats[sockfile]
   if not self then return end
 
-  print('DBG[28]: nvt.lua:101 (after if not self then return end)')
   self.sock = vim.fn.sockconnect("pipe", sockfile, {rpc = true})
-  print('DBG[29]: nvt.lua:103 (after self.sock = vim.fn.sockconnect(pipe, soc…)')
 
   self:run_child_notify("require'nvim-task.config'.load_session(...)", self.sname)
   -- for _, cb in ipairs(self.sock_waiters) do
   --   cb(self.sock)
   -- end
   -- self.sock_waiters = {}
+end
+
+function NVTStrategy.new_child_msg(sockfile, msg, error)
+  local self = sockfiles_to_strats[sockfile]
+  if not self then return end
+  -- self:new_msg(msg)
+
+  self.task:dispatch("on_output", msg)
+  self.task:dispatch("on_output_lines", vim.split(msg, "\n"))
 end
 
 local function isRecording() return vim.fn.reg_recording() ~= "" end
@@ -149,7 +156,7 @@ function NVTStrategy:set_data(data)
 end
 
 function NVTStrategy:get_win()
-  local win = self.term.window
+  local win = self.window -- TODO set window
   -- the session may currently be un-toggled
   if not vim.api.nvim_win_is_valid(win) then return nil end
 
@@ -164,7 +171,7 @@ function NVTStrategy:_record_toggle()
 	if not isRecording() then
 		-- NOTE: above autocmd may have set regOverride
 		a_normal("q" .. tempreg)
-		print("Recording to [" .. tempreg .. "]…")
+		vim.notify("Recording to [" .. tempreg .. "]…")
     self:run_child_notify("require'nvim-task.config'.save_session()")
 		return
   end
@@ -186,7 +193,7 @@ function NVTStrategy:_record_toggle()
     local saved_file = get_session_file(nvt_conf.saved_test_name, db.sessiondir)
     local new_file = get_session_file(name, db.sessiondir) -- name the session after the test
     -- TODO check and confirm override if name/session already exists
-    print("renaming session:", saved_file, new_file)
+    vim.notify("renaming session:", saved_file, new_file)
     vim.loop.fs_rename(saved_file, new_file)
     self:run_child_notify(("require'nvim-task.config'.record_finish(%s)"):format(name))
     self.sname = name
@@ -194,7 +201,7 @@ function NVTStrategy:_record_toggle()
     self:set_data({sess = name, recording = vim.fn.keytrans(recording)})
 
     self.finished_playback_restart = true
-    print(("press '%s' to restart"):format(play_recording_shortcut))
+    vim.notify(("press '%s' to restart"):format(play_recording_shortcut))
   end
 end
 
@@ -206,7 +213,7 @@ end
 
 function NVTStrategy:play_recording()
   if #self.rem_recording == 0 then
-    print("no recording to play!")
+    vim.notify("no recording to play!")
     return
   end
 
@@ -242,7 +249,7 @@ function NVTStrategy:maybe_play_recording()
       -- make_test(curr_test)
     end
 
-    print(("press '%s' again to restart"):format(play_recording_shortcut))
+    vim.notify(("press '%s' again to restart"):format(play_recording_shortcut))
     return
   end
 
@@ -250,12 +257,12 @@ function NVTStrategy:maybe_play_recording()
     self.finished_playback = self:play_recording()
     if self.finished_playback then
       if self.trace_playback then
-        print(("playback finished, press '%s' again to capture trace"):format(play_recording_shortcut))
+        vim.notify(("playback finished, press '%s' again to capture trace"):format(play_recording_shortcut))
       else
-        print("playback finished")
+        vim.notify("playback finished")
       end
     else
-      print(("hit breakpoint (%d remaining)"):format(#self.rem_recording))
+      vim.notify(("hit breakpoint (%d remaining)"):format(#self.rem_recording))
     end
     return
   end
@@ -267,7 +274,7 @@ end
 function NVTStrategy:addBreakPoint(key)
 	if isRecording() and vim.fn.reg_recording() == tempreg then
 		-- INFO nothing happens, but the key is still recorded in the macro
-		print("Macro breakpoint added.")
+		vim.notify("Macro breakpoint added.")
 	else
     vim.fn.feedkeys(vim.api.nvim_replace_termcodes(key, true, true, true), "n")
 	end
@@ -279,17 +286,51 @@ function NVTStrategy:pick_trace()
     local traced_calls = trace._trace_picker_toplevel(results, self.data.traced_calls or {})
     self:set_data({traced_calls = traced_calls})
     self:run_child("return require'nvim-task.config'.add_trace_wrappers(...)", nvt_conf.get_whitelist(traced_calls))
-    self.term:open()
+    -- self.term:open() -- TODO
   end, function() end)
+end
+
+function NVTStrategy:__spawn(task)
+  local cmd = task.cmd
+  if type(cmd) == "table" then
+    cmd = require"overseer.shell".escape_cmd(cmd, "strong")
+  end
+  local dir = task.cwd
+  if dir then
+    dir = vim.fn.expand(dir)
+  else
+    dir = vim.loop.cwd()
+  end
+  self.job_id = vim.fn.termopen(cmd, {
+    detach = 1,
+    cwd = dir,
+    -- on_exit = __handle_exit(self),
+    -- on_stdout = self:__make_output_handler(self.on_stdout),
+    -- on_stderr = self:__make_output_handler(self.on_stderr),
+    env = task.env,
+    -- clear_env = self.clear_env,
+  })
+end
+
+function NVTStrategy:spawn(task)
+  self.bufnr = vim.api.nvim_create_buf(false, false)
+  self.msg_bufnr = vim.api.nvim_create_buf(false, false)
+  vim.api.nvim_buf_call(self.bufnr, function() self:__spawn(task) end)
+end
+
+function NVTStrategy:open(task)
+  print"FIXME open"
 end
 
 function NVTStrategy:start(task)
   self:_reset()
 
-  tts.start(self, task)
+  -- tts.start(self, task)
+  self:spawn(task)
+  self:open()
   -- TODO check that task.cmd string starts with `nvim`
 
-  local buf = self.term.bufnr
+  local buf = self.bufnr
   self.task = task
   table.insert(task_stack, task)
   vim.keymap.set("t", play_recording_shortcut, function() self:maybe_play_recording() end, {buffer = buf})
@@ -320,17 +361,17 @@ function NVTStrategy.abort_last_task()
     task:stop()
     return
   end
-  print(('no tasks currently running'))
+  vim.notify(('no tasks currently running'))
 end
 
 function NVTStrategy.restart_last_task()
   local task = NVTStrategy.last_task()
   if task then
     task.strategy:restart()
-    print(('restarted task "%s"'):format(task.strategy.sname))
+    vim.notify(('restarted task "%s"'):format(task.strategy.sname))
     return
   end
-  print(('no tasks currently running'))
+  vim.notify(('no tasks currently running'))
 end
 
 function NVTStrategy:stop()
@@ -340,13 +381,16 @@ function NVTStrategy:stop()
       break
     end
   end
-  self.term:close()
-  tts.stop(self)
-  print(('aborted task "%s"'):format(self.sname))
+
+  vim.fn.jobstop(self.chan_id)
+  -- self.term:close() 
+  -- tts.stop(self) -- TODO close windows, delete bufs and vim.fn.stopjob()
+  vim.notify(('aborted task "%s"'):format(self.sname))
 end
 
 function NVTStrategy:dispose()
-  tts.dispose(self)
+  self:stop()
+  -- tts.dispose(self)
 end
 
 return NVTStrategy

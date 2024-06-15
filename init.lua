@@ -188,7 +188,7 @@ vim.api.nvim_create_autocmd("BufRead", {
 vim.api.nvim_create_autocmd("BufEnter", {
   callback = function (_)
     if vim.o.ft == "help" then
-      vim.cmd.wincmd"L"
+      vim.cmd.wincmd"H"
       vim.cmd("vert resize 80")
       vim.cmd("set winfixwidth")
       -- require"nvim-tree.api".tree.close()
