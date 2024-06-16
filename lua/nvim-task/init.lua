@@ -49,6 +49,7 @@ local test_mappings = {
   trace_picker = test_leader .. "t",
   edit_test = test_leader .. "e",
   trace_test = test_leader .. "a",
+  toggle = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<C-Esc>"
 }
 
 -- TODO status line indicator for current recording and keymap to clear recording
@@ -182,6 +183,25 @@ M.save_restart = function()
   M.restart()
 end
 vim.keymap.set("n", "<leader>W", M.save_restart)
+
+function M.toggle_curr_test()
+  local task = strat.last_task()
+  if task then
+    task.strategy:toggle()
+  else
+    vim.notify(('no tasks currently running'))
+  end
+end
+
+vim.keymap.set("n", test_mappings.toggle, M.toggle_curr_test)
+
+vim.keymap.set(
+  { "n", "o", "x" },
+  "<C-n>",
+  function ()
+    print"HERE !"
+  end
+)
 
 vim.keymap.set(
   { "n", "o", "x" },

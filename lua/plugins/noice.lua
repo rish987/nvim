@@ -1,6 +1,6 @@
 return {
   "folke/noice.nvim",
-  enabled = not vim.g.StartedByNvimTask,
+  enabled = true,
   -- enabled = false,
   -- priority = 1000,
   lazy = false,
@@ -14,13 +14,13 @@ return {
       },
     },
     messages = {
-      enabled = true
+      enabled = not vim.g.StartedByNvimTask
     },
     cmdline = {
       enabled = true
     },
     notify = {
-      enabled = true
+      enabled = not vim.g.StartedByNvimTask
     },
     -- you can enable a preset for easier configuration
     presets = {

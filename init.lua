@@ -26,6 +26,8 @@ vim.o.shiftwidth=2
 vim.o.mouse = ""
 vim.o.exrc = true
 
+print"test"
+
 -- local keymap = vim.keymap.set
 -- vim.keymap.set = function(mode, lhs, rhs, opts)
 --   local new_rhs = rhs

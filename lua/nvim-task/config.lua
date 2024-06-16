@@ -15,42 +15,6 @@ end
 
 local log = require"vim.lsp.log"
 
-function M.read_data(data_file)
-  if vim.fn.filereadable(data_file) ~= 0 then
-    local ret = {}
-    local readfn = function ()
-      ret = vim.fn.json_decode(vim.fn.readfile(data_file))
-    end
-    local success = false
-    for _ = 1, 1000 do
-      success, _ = pcall(readfn)
-      if success then break end
-    end
-
-    if not success then print("error reading json file") return {} end
-    -- log.error( data_file .. "reading: " .. vim.inspect(ret))
-    return ret
-  else
-    return {}
-  end
-end
-
-function M.erase_data(data_file, key)
-  local data = M.read_data(data_file)
-  data[key] = nil
-
-  local json = vim.fn.json_encode(data)
-  vim.fn.writefile({json}, data_file)
-end
-
-function M.write_data(data_file, new_data)
-  local data = vim.tbl_extend("keep", new_data, M.read_data(data_file))
-
-  -- log.error( data_file .. " writing: " .. vim.inspect(data))
-  local json = vim.fn.json_encode(data)
-  vim.fn.writefile({json}, data_file)
-end
-
 function M.unpatch(arg)
   if type(arg) == "table" then
     if arg["_patched"] then
@@ -132,14 +96,6 @@ vim.o.swapfile = false
 
 M.ns = vim.api.nvim_create_namespace("nvim-task")
 
-local msgview_enabled = false
-
-function M.msgview_enable()
-  if msgview_enabled then return end
-	require("bmessages").toggle({ split_type = "vsplit", keep_focus = true, split_size_vsplit = 80, split_direction = "botright"})
-  msgview_enabled = true
-end
-
 vim.keymap.set("n", "<leader>xn", function ()
   print("HERE")
 end)
@@ -158,6 +114,36 @@ end
 --   require"resession".load(nil, { dir = sessiondir })
 -- end)
 
+local ns = vim.api.nvim_create_namespace"NvimTask"
+
+local function msgview_enable()
+  -- TODO recall that noice is a dependency because cmdline also uses the message view
+  vim.ui_attach(ns, {ext_messages = true}, function(event, kind, content, _)
+    if event ~= "msg_show" then return end
+    local is_error =
+      kind == "emsg" or
+      kind == "echoerr" or
+      kind == "lua_error" or
+      kind == "rpc_error"
+
+    if kind == "return_prompt" then
+      vim.api.nvim_input("<cr>")
+      return
+    end
+
+    local str = ""
+    for i, val in ipairs(content) do
+      if i > 1 then
+        str = str .. "\n" .. val[2]
+      else
+        str = str .. val[2]
+      end
+    end
+
+    vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.new_child_msg(...)", {sockfile, str, is_error})
+  end)
+end
+
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = vim.schedule_wrap(function()
     vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {sockfile})
@@ -165,41 +151,18 @@ vim.api.nvim_create_autocmd("VimEnter", {
   end),
 })
 
-local ns = vim.api.nvim_create_namespace"NvimTask"
-
-vim.ui_attach(ns, {ext_messages = true}, function(event, kind, content, _)
-  if event ~= "msg_show" then return end
-  local is_error =
-    kind == "emsg" or
-    kind == "echoerr" or
-    kind == "lua_error" or
-    kind == "rpc_error"
-
-  if kind == "return_prompt" then
-    vim.api.nvim_input("<cr>")
-    return
-  end
-
-  local str = ""
-  for i, val in ipairs(content) do
-    if i > 1 then
-      str = str .. "\n" .. val[2]
-    else
-      str = str .. val[2]
-    end
-  end
-
-  vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.new_child_msg(...)", {sockfile, str, is_error})
-end)
 
 function M.load_session(_sess)
+  local startup_msgs = vim.api.nvim_cmd({ cmd = "messages" }, { output = true })
+  msgview_enable()
+  print(startup_msgs)
   sess = _sess
   if M.session_exists(sess, sessiondir) then
     require"resession".load(sess, { dir = sessiondir, silence_errors = true })
   else
     sess = M.temp_test_name
   end
-  M.msgview_enable()
+  -- M.msgview_enable()
 end
 
 -- vim.keymap.set("n", "<leader>Xn", function ()

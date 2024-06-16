@@ -24,6 +24,7 @@ local startstop_recording = vim.g.StartedByNvimTask and "<C-A-f>" or "<C-f>"
 local breakpoint_key = vim.g.StartedByNvimTask and "<C-A-e>" or "<C-e>"
 local restart_key = vim.g.StartedByNvimTask and "<C-A-x>r" or "<C-x>r"
 local abort_key = vim.g.StartedByNvimTask and "<C-A-x>x" or "<C-x>x"
+local toggle_key = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<C-Esc>"
 
 local normalizeKeycodes = function(mapping)
 	return vim.fn.keytrans(vim.api.nvim_replace_termcodes(mapping, true, true, true))
@@ -34,6 +35,7 @@ function NVTStrategy.new(opts)
     sock_waiters = {},
     sname = opts.sname,
     bufnr = nil,
+    msg_bufnr = nil,
     chan_id = nil,
     opts = opts,
     term = nil,
@@ -55,6 +57,10 @@ function NVTStrategy:_reset()
   self.finished_playback = false
   self.finished_playback_restart = false
   self.chan_id = nil
+  self.layout = nil
+  self.msg_popup = nil
+  self.nvim_popup = nil
+  self.is_open = false
 end
 
 function NVTStrategy:run_child(code, ...)
@@ -82,12 +88,12 @@ function NVTStrategy:restart()
   -- require"overseer".run_action(self.task, "restart")
   -- since we need to wait for the toggleterm to properly close
   -- so as to avoid the issue where it opens in normal mode
-  local was_open = self:is_open() -- TODO implement
+  local was_open = self.is_open
 
   self.task:stop()
   self.task:reset()
 
-  vim.defer_fn(function()
+  vim.defer_fn(function() -- FIXME still need to defer?
     self.task:start()
   end, was_open and 100 or 0)
 end
@@ -117,6 +123,30 @@ function NVTStrategy.new_child_msg(sockfile, msg, error)
 
   self.task:dispatch("on_output", msg)
   self.task:dispatch("on_output_lines", vim.split(msg, "\n"))
+
+  local msgs_text = vim.api.nvim_buf_get_text(self.msg_bufnr, 0, 0, -1, -1, {})
+  local num_lines = #msgs_text
+  local last_line_length = #msgs_text[num_lines]
+  local msgwin = self.msg_popup.winid
+
+  local cursorpos
+  if msgwin then
+    cursorpos = vim.api.nvim_win_get_cursor(msgwin)
+  end
+
+  local split_msg = vim.split(msg, "\n")
+
+  local new_text = last_line_length == 0 and split_msg or {"", unpack(split_msg)}
+  vim.api.nvim_buf_set_text(self.msg_bufnr, num_lines - 1, last_line_length, num_lines - 1, last_line_length, new_text)
+
+  if msgwin then
+    local at_bottom = cursorpos[1] == num_lines
+
+    -- autoscroll
+    if at_bottom then
+      vim.fn.win_execute(msgwin, "normal! G")
+    end
+  end
 end
 
 local function isRecording() return vim.fn.reg_recording() ~= "" end
@@ -301,7 +331,7 @@ function NVTStrategy:__spawn(task)
   else
     dir = vim.loop.cwd()
   end
-  self.job_id = vim.fn.termopen(cmd, {
+  self.chan_id = vim.fn.termopen(cmd, {
     detach = 1,
     cwd = dir,
     -- on_exit = __handle_exit(self),
@@ -318,8 +348,100 @@ function NVTStrategy:spawn(task)
   vim.api.nvim_buf_call(self.bufnr, function() self:__spawn(task) end)
 end
 
-function NVTStrategy:open(task)
-  print"FIXME open"
+-- function NVTStrategy:__check_wins()
+--   if self.win then
+--     if not vim.api.nvim_win_is_valid(self.win) then
+--       self.win = nil
+--     end
+--   end
+--
+--   if self.msg_win then
+--     if not vim.api.nvim_win_is_valid(self.msg_win) then
+--       self.msg_win = nil
+--     end
+--   end
+-- end
+--
+-- function NVTStrategy:__check_bufnrs()
+--   if self.bufnr then
+--     if not vim.api.nvim_bufnr_is_valid(self.bufnr) then
+--       self.bufnr = nil
+--     end
+--   end
+--
+--   if self.msg_bufnr then
+--     if not vim.api.nvim_bufnr_is_valid(self.msg_bufnr) then
+--       self.msg_bufnr = nil
+--     end
+--   end
+-- end
+--
+
+function NVTStrategy:open()
+  if not self.layout then
+    local Popup = require("nui.popup")
+    local Layout = require("nui.layout")
+
+    self.nvim_popup, self.msg_popup = Popup({
+      enter = true,
+      border = "double",
+      bufnr = self.bufnr
+    }), Popup({
+      border = "single",
+      bufnr = self.msg_bufnr
+    })
+
+    local layout = Layout(
+      {
+        anchor = "NW",
+        relative = "editor",
+        position = vim.g.StartedByNvimTask and "50%" or {
+          row = "50%",
+          col = 85
+        },
+        size = vim.g.StartedByNvimTask and "90%" or {
+          height = "90%",
+          width = "70%" -- FIXME negative column offset?
+        },
+      },
+      Layout.Box({
+        Layout.Box(self.nvim_popup, { size = "70%" }),
+        Layout.Box(self.msg_popup, { size = "30%" }),
+      }, { dir = "row" })
+    )
+
+    layout:mount()
+    vim.cmd.startinsert()
+
+    self.layout = layout
+
+    -- self.win = nvim_popup.winid
+  else
+    self.layout:show()
+    vim.cmd.startinsert()
+  end
+
+  self.msg_win = self.msg_popup.winid
+
+  self.is_open = true
+end
+
+function NVTStrategy:close()
+  if not self.layout then return end
+
+  self.layout:hide()
+  self.is_open = false
+  -- self.win = nvim_popup.winid
+  -- self.msg_win = msg_popup.winid
+end
+
+function NVTStrategy:toggle()
+  if self.is_open then
+    self:close()
+    return
+  end
+
+  self:open()
 end
 
 function NVTStrategy:start(task)
@@ -338,6 +460,7 @@ function NVTStrategy:start(task)
   vim.keymap.set("t", breakpoint_key, function() self:addBreakPoint(breakpoint_key) end, {buffer = buf})
   vim.keymap.set("t", restart_key, function() self:restart() end, {buffer = buf})
   vim.keymap.set("t", abort_key, function() self:abort() end, {buffer = buf})
+  vim.keymap.set("t", toggle_key, function() self:toggle() end, {buffer = buf})
 
   db.set_test_metadata({curr_test = self.sname})
   -- vim.keymap.set("t", self.opts.exit_test, function () M.abort_curr_task() end, {buffer = buf})
@@ -381,6 +504,10 @@ function NVTStrategy:stop()
       break
     end
   end
+  self.layout:unmount()
+  self.msg_popup = nil
+  self.nvim_popup = nil
+  self.layout = nil
 
   vim.fn.jobstop(self.chan_id)
   -- self.term:close() 
