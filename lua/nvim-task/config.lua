@@ -162,6 +162,8 @@ function M.load_session(_sess)
   else
     sess = M.temp_test_name
   end
+
+  vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.child_loaded_notify(...)", {sockfile})
   -- M.msgview_enable()
 end
 

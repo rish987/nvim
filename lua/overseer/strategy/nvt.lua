@@ -33,6 +33,7 @@ end
 function NVTStrategy.new(opts)
   local new = {
     sock_waiters = {},
+    child_loaded = false,
     sname = opts.sname,
     bufnr = nil,
     msg_bufnr = nil,
@@ -61,6 +62,9 @@ function NVTStrategy:_reset()
   self.msg_popup = nil
   self.nvim_popup = nil
   self.is_open = false
+  self.win_before = nil
+  self.sock_waiters = {}
+  self.child_loaded = false
 end
 
 function NVTStrategy:run_child(code, ...)
@@ -110,10 +114,17 @@ function NVTStrategy.set_child_sock(sockfile)
   self.sock = vim.fn.sockconnect("pipe", sockfile, {rpc = true})
 
   self:run_child_notify("require'nvim-task.config'.load_session(...)", self.sname)
-  -- for _, cb in ipairs(self.sock_waiters) do
-  --   cb(self.sock)
-  -- end
-  -- self.sock_waiters = {}
+end
+
+function NVTStrategy.child_loaded_notify(sockfile)
+  local self = sockfiles_to_strats[sockfile]
+  if not self then return end
+  self.child_loaded = true
+
+  for _, cb in ipairs(self.sock_waiters) do
+    cb()
+  end
+  self.sock_waiters = {}
 end
 
 function NVTStrategy.new_child_msg(sockfile, msg, error)
@@ -223,7 +234,7 @@ function NVTStrategy:_record_toggle()
     local saved_file = get_session_file(nvt_conf.saved_test_name, db.sessiondir)
     local new_file = get_session_file(name, db.sessiondir) -- name the session after the test
     -- TODO check and confirm override if name/session already exists
-    vim.notify("renaming session:", saved_file, new_file)
+    vim.notify(("renaming session: %s to %s" ):format(saved_file, new_file))
     vim.loop.fs_rename(saved_file, new_file)
     self:run_child_notify(("require'nvim-task.config'.record_finish(%s)"):format(name))
     self.sname = name
@@ -255,6 +266,7 @@ function NVTStrategy:play_recording()
   local keys = self.rem_recording[1]
   table.remove(self.rem_recording, 1)
 
+  -- TODO does this work properly with '<' character in recording?
   self:run_child("vim.api.nvim_input(...)", keys)
   -- local to_send = vim.api.nvim_replace_termcodes(keys, true, true, true)
   -- vim.fn.chansend(self.chan_id, to_send)
@@ -263,9 +275,18 @@ function NVTStrategy:play_recording()
   return #self.rem_recording == 0
 end
 
-function NVTStrategy:maybe_play_recording()
-  if isRecording() then goto feed end
+function NVTStrategy:_maybe_play_recording()
+  if self.rem_recording and #self.rem_recording > 0 then
+    self.finished_playback = self:play_recording()
+    return true
+  end
 
+  self.finished_playback = true
+
+  return false
+end
+
+function NVTStrategy:maybe_play_recording()
   if self.finished_playback_restart then
     self:restart()
     return
@@ -283,8 +304,7 @@ function NVTStrategy:maybe_play_recording()
     return
   end
 
-  if self.rem_recording and #self.rem_recording > 0 then
-    self.finished_playback = self:play_recording()
+  if not isRecording() and self:_maybe_play_recording() then
     if self.finished_playback then
       if self.trace_playback then
         vim.notify(("playback finished, press '%s' again to capture trace"):format(play_recording_shortcut))
@@ -297,7 +317,6 @@ function NVTStrategy:maybe_play_recording()
     return
   end
 
-  ::feed::
   self:run_child("vim.fn.feedkeys(vim.api.nvim_replace_termcodes(..., true, true, true))", play_recording_shortcut)
 end
 
@@ -342,10 +361,39 @@ function NVTStrategy:__spawn(task)
   })
 end
 
+function NVTStrategy:__sock_wait(cb)
+  -- already connected
+  if self.child_loaded then
+    cb()
+    return
+  end
+
+  table.insert(self.sock_waiters, cb)
+end
+
+NVTStrategy._sock_wait = a.wrap(NVTStrategy.__sock_wait, 2)
+
 function NVTStrategy:spawn(task)
-  self.bufnr = vim.api.nvim_create_buf(false, false)
-  self.msg_bufnr = vim.api.nvim_create_buf(false, false)
-  vim.api.nvim_buf_call(self.bufnr, function() self:__spawn(task) end)
+  a.run(function()
+    self.bufnr = vim.api.nvim_create_buf(false, false)
+    self.msg_bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_call(self.bufnr, function() self:__spawn(task) end)
+    if self.opts.auto then
+      self:_sock_wait()
+      local first = true
+      while true do
+        -- TODO check for error and abort if so
+        if not first then
+          a_util.sleep(300)
+        else
+          first = false
+        end
+
+        self:_maybe_play_recording()
+        if self.finished_playback then break end
+      end
+    end
+  end, function() end)
 end
 
 -- function NVTStrategy:__check_wins()
@@ -378,6 +426,7 @@ end
 --
 
 function NVTStrategy:open()
+  self.win_before = vim.api.nvim_get_current_win()
   if not self.layout then
     local Popup = require("nui.popup")
     local Layout = require("nui.layout")
@@ -401,7 +450,7 @@ function NVTStrategy:open()
         },
         size = vim.g.StartedByNvimTask and "90%" or {
           height = "90%",
-          width = "70%" -- FIXME negative column offset?
+          width = "75%" -- FIXME negative column offset?
         },
       },
       Layout.Box({
@@ -411,15 +460,20 @@ function NVTStrategy:open()
     )
 
     layout:mount()
-    vim.cmd.startinsert()
 
     self.layout = layout
 
     -- self.win = nvim_popup.winid
   else
     self.layout:show()
-    vim.cmd.startinsert()
   end
+
+  vim.defer_fn(function ()
+    if self.is_open then
+      vim.cmd.startinsert()
+    end
+  end, 300) -- FIXME
+  -- vim.cmd.startinsert()
 
   self.msg_win = self.msg_popup.winid
 
@@ -431,6 +485,10 @@ function NVTStrategy:close()
 
   self.layout:hide()
   self.is_open = false
+
+  if vim.api.nvim_win_is_valid(self.win_before) then
+    vim.api.nvim_set_current_win(self.win_before)
+  end
   -- self.win = nvim_popup.winid
   -- self.msg_win = msg_popup.winid
 end
@@ -504,7 +562,7 @@ function NVTStrategy:stop()
       break
     end
   end
-  self.layout:unmount()
+  self.layout:unmount() -- FIXME this can be nil? saw error when aborting task
   self.msg_popup = nil
   self.nvim_popup = nil
   self.layout = nil

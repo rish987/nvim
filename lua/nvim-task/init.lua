@@ -39,17 +39,24 @@ local a = require"plenary.async"
 local strat = require"overseer.strategy.nvt"
 
 local test_leader = vim.g.StartedByNvimTask and "<C-A-x>" or "<C-x>"
+local test_leader_manual = test_leader .. test_leader
 local test_mappings = {
   restart_test = test_leader .. "r",
+  restart_test_manual = test_leader_manual .. "r",
   exit_test = test_leader .. "x",
   blank_test = test_leader .. "b",
   duplicate_test = test_leader .. "d",
   delete_test = test_leader .. "D",
   find_test = test_leader .. "f",
+  find_test_manual = test_leader_manual .. "f",
   trace_picker = test_leader .. "t",
   edit_test = test_leader .. "e",
   trace_test = test_leader .. "a",
   toggle = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<C-Esc>"
+}
+
+local def_opts = {
+  auto = true
 }
 
 -- TODO status line indicator for current recording and keymap to clear recording
@@ -65,14 +72,17 @@ function M.edit_curr_test()
   end
 end
 
-local _run_template = a.wrap(require"overseer".run_template, 2)
+-- local _run_template = a.wrap(require"overseer".run_template, 2)
 -- local _wait_sock = a.wrap(function(cb)
 --   table.insert(sock_waiters, cb)
 -- end, 1)
 
-local function _new_nvt(sname)
+local function _new_nvt(sname, _opts)
+  local params = vim.tbl_extend("keep", _opts or {}, def_opts)
+
   local curr_test = db.get_tests_metadata().curr_test
   if not sname then sname = curr_test end
+  params.sname = sname
 
   if sname == "" then
     print("loading blank test")
@@ -89,21 +99,21 @@ local function _new_nvt(sname)
     end
   end
 
-  require"overseer".run_template({name = "nvt", params = {sname = sname}})
+  require"overseer".run_template({name = "nvt", params = params})
   -- _wait_sock()
 end
 
-local function _new_nvim_task(test)
-  _new_nvt(test)
+local function _new_nvim_task(test, opts)
+  _new_nvt(test, opts)
 end
 
-local function new_nvim_task(test)
+local function new_nvim_task(test, opts)
   a.run(function()
-    _new_nvim_task(test)
+    _new_nvim_task(test, opts)
   end, function() end)
 end
 
-function M.test_picker()
+function M.test_picker(task_opts)
   local actions = require "telescope.actions"
   local action_state = require "telescope.actions.state"
   local finders = require "telescope.finders"
@@ -142,7 +152,7 @@ function M.test_picker()
           local selection = action_state.get_selected_entry()
 
           actions.close(prompt_bufnr)
-          new_nvim_task(selection.value)
+          new_nvim_task(selection.value, task_opts)
         end)
 
         return true
@@ -150,8 +160,8 @@ function M.test_picker()
     })
 end
 
-function M.pick_test()
-  local picker = M.test_picker()
+function M.pick_test(opts)
+  local picker = M.test_picker(opts)
   if picker then picker:find() end
 end
 
@@ -167,20 +177,30 @@ end
 -- vim.keymap.set("n", test_mappings.restart_test, M.restart)
 vim.keymap.set("n", test_mappings.exit_test, strat.abort_last_task)
 vim.keymap.set("n", test_mappings.find_test, M.pick_test)
+vim.keymap.set("n", test_mappings.find_test_manual,
+  function ()
+    M.pick_test({auto = false})
+  end
+)
 vim.keymap.set("n", test_mappings.blank_test, M.blank_sess)
 vim.keymap.set("n", test_mappings.edit_test, M.edit_curr_test)
 -- vim.keymap.set("n", test_mappings.trace_picker, M.pick_trace)
-M.restart = function()
+M.restart = function(opts)
   if strat.last_task() then
     strat.restart_last_task()
   else
-    new_nvim_task()
+    new_nvim_task(nil, opts)
   end
 end
 vim.keymap.set("n", test_mappings.restart_test, M.restart)
-M.save_restart = function()
+vim.keymap.set("n", test_mappings.restart_test_manual,
+  function ()
+    M.restart({auto = false})
+  end
+)
+M.save_restart = function(opts)
   vim.cmd.write()
-  M.restart()
+  M.restart(opts)
 end
 vim.keymap.set("n", "<leader>W", M.save_restart)
 

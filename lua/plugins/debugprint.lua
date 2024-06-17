@@ -5,6 +5,9 @@ return {
     "nvim-treesitter/nvim-treesitter"
   },
   create_keymaps = false,
+  init = function()
+    vim.keymap.set({"n"}, "<leader>DD", ":DeleteDebugPrints<CR>")
+  end,
   -- Remove the following line to use development versions,
   -- not just the formal releases
   opts = {

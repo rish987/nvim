@@ -26,7 +26,7 @@ return {
         "--cmd", ('let g:NvimTaskChildSockfile = "%s"'):format(sockfile),
         "--listen", sockfile
       },
-      strategy = {"nvt", sname = params.sname, sockfile = sockfile},
+      strategy = {"nvt", sname = params.sname, auto = params.auto, sockfile = sockfile},
       components = {
         -- "nvt",
         "default",
