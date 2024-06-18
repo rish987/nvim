@@ -140,17 +140,18 @@ local function msgview_enable()
       end
     end
 
+    log.warn(sessiondir, str)
     vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.new_child_msg(...)", {sockfile, str, is_error})
   end)
 end
 
+
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = vim.schedule_wrap(function()
-    vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {sockfile})
+    vim.fn.rpcrequest(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {sockfile})
     -- now, wait for M.load_session to be called by the parent instance (after it has connected)
   end),
 })
-
 
 function M.load_session(_sess)
   local startup_msgs = vim.api.nvim_cmd({ cmd = "messages" }, { output = true })
@@ -176,7 +177,6 @@ end
 -- end)
 
 -- resession-generic
-
 
 vim.api.nvim_create_autocmd("VimLeavePre", {
   callback = function()

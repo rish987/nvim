@@ -35,6 +35,7 @@ function NVTStrategy.new(opts)
     sock_waiters = {},
     child_loaded = false,
     sname = opts.sname,
+    headless = opts.headless,
     bufnr = nil,
     msg_bufnr = nil,
     chan_id = nil,
@@ -102,10 +103,7 @@ function NVTStrategy:restart()
   end, was_open and 100 or 0)
 end
 
-function NVTStrategy:abort()
-  self.task:stop()
-  self.task:dispose()
-end
+local log = require"vim.lsp.log"
 
 function NVTStrategy.set_child_sock(sockfile)
   local self = sockfiles_to_strats[sockfile]
@@ -113,7 +111,9 @@ function NVTStrategy.set_child_sock(sockfile)
 
   self.sock = vim.fn.sockconnect("pipe", sockfile, {rpc = true})
 
-  self:run_child_notify("require'nvim-task.config'.load_session(...)", self.sname)
+  vim.defer_fn(function()
+    self:run_child("require'nvim-task.config'.load_session(...)", self.sname)
+  end, 2000)
 end
 
 function NVTStrategy.child_loaded_notify(sockfile)
@@ -132,9 +132,12 @@ function NVTStrategy.new_child_msg(sockfile, msg, error)
   if not self then return end
   -- self:new_msg(msg)
 
-  self.task:dispatch("on_output", msg)
-  self.task:dispatch("on_output_lines", vim.split(msg, "\n"))
+  -- self.task:dispatch("on_output", msg)  -- FIXME why does this get stuck?
+  -- self.task:dispatch("on_output_lines", vim.split(msg, "\n"))
 
+  if self.headless then print(msg) return end
+
+  -- TODO move to its own component
   local msgs_text = vim.api.nvim_buf_get_text(self.msg_bufnr, 0, 0, -1, -1, {})
   local num_lines = #msgs_text
   local last_line_length = #msgs_text[num_lines]
@@ -228,6 +231,8 @@ function NVTStrategy:_record_toggle()
   if name == require"nvim-task.config".temp_test_name then
     name = _input({ prompt = "Test name: " })
   end
+
+  vim.cmd.startinsert()
 
   if name then
     local get_session_file = require"resession.util".get_session_file
@@ -339,7 +344,7 @@ function NVTStrategy:pick_trace()
   end, function() end)
 end
 
-function NVTStrategy:__spawn(task)
+function NVTStrategy:__spawn(task, headless)
   local cmd = task.cmd
   if type(cmd) == "table" then
     cmd = require"overseer.shell".escape_cmd(cmd, "strong")
@@ -350,15 +355,29 @@ function NVTStrategy:__spawn(task)
   else
     dir = vim.loop.cwd()
   end
-  self.chan_id = vim.fn.termopen(cmd, {
-    detach = 1,
-    cwd = dir,
-    -- on_exit = __handle_exit(self),
-    -- on_stdout = self:__make_output_handler(self.on_stdout),
-    -- on_stderr = self:__make_output_handler(self.on_stderr),
-    env = task.env,
-    -- clear_env = self.clear_env,
-  })
+  if headless then
+    self.chan_id = vim.fn.jobstart(cmd, { --vim.fn.split(cmd, " "), {
+      cwd = dir,
+      -- on_exit = __handle_exit(self),
+      -- on_stdout = self:__make_output_handler(self.on_stdout),
+      -- on_stderr = self:__make_output_handler(self.on_stderr),
+      env = task.env,
+      pty = true,
+      -- clear_env = self.clear_env,
+    })
+  else
+    self.chan_id = vim.fn.termopen(cmd, {
+      detach = 1,
+      cwd = dir,
+      -- on_exit = __handle_exit(self),
+      -- on_stdout = self:__make_output_handler(self.on_stdout),
+      -- on_stderr = self:__make_output_handler(self.on_stderr),
+      env = task.env,
+      -- pty = true
+      rpc = true
+      -- clear_env = self.clear_env,
+    })
+  end
 end
 
 function NVTStrategy:__sock_wait(cb)
@@ -375,9 +394,13 @@ NVTStrategy._sock_wait = a.wrap(NVTStrategy.__sock_wait, 2)
 
 function NVTStrategy:spawn(task)
   a.run(function()
-    self.bufnr = vim.api.nvim_create_buf(false, false)
-    self.msg_bufnr = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_call(self.bufnr, function() self:__spawn(task) end)
+    if self.headless then
+      self:__spawn(task, true)
+    else
+      self.bufnr = vim.api.nvim_create_buf(false, false)
+      self.msg_bufnr = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_call(self.bufnr, function() self:__spawn(task) end)
+    end
     if self.opts.auto then
       self:_sock_wait()
       local first = true
@@ -426,6 +449,11 @@ end
 --
 
 function NVTStrategy:open()
+  if self.headless then
+    print("TODO open headless instance?")
+    return
+  end
+
   self.win_before = vim.api.nvim_get_current_win()
   if not self.layout then
     local Popup = require("nui.popup")
@@ -487,6 +515,7 @@ function NVTStrategy:close()
   self.is_open = false
 
   if vim.api.nvim_win_is_valid(self.win_before) then
+    print('DBG[9]: nvt.lua:507: self.win_before=' .. vim.inspect(self.win_before))
     vim.api.nvim_set_current_win(self.win_before)
   end
   -- self.win = nvim_popup.winid
@@ -507,6 +536,11 @@ function NVTStrategy:start(task)
 
   -- tts.start(self, task)
   self:spawn(task)
+
+  db.set_test_metadata({curr_test = self.sname})
+
+  if self.headless then return end
+
   self:open()
   -- TODO check that task.cmd string starts with `nvim`
 
@@ -517,10 +551,8 @@ function NVTStrategy:start(task)
   vim.keymap.set("t", startstop_recording, function() self:record_toggle() end, {buffer = buf})
   vim.keymap.set("t", breakpoint_key, function() self:addBreakPoint(breakpoint_key) end, {buffer = buf})
   vim.keymap.set("t", restart_key, function() self:restart() end, {buffer = buf})
-  vim.keymap.set("t", abort_key, function() self:abort() end, {buffer = buf})
+  vim.keymap.set("t", abort_key, function() self:dispose() end, {buffer = buf})
   vim.keymap.set("t", toggle_key, function() self:toggle() end, {buffer = buf})
-
-  db.set_test_metadata({curr_test = self.sname})
   -- vim.keymap.set("t", self.opts.exit_test, function () M.abort_curr_task() end, {buffer = buf})
   -- vim.keymap.set("t", self.opts.restart_test, function () M.restart() end, {buffer = buf})
   -- vim.keymap.set("t", self.opts.blank_test, function () M.blank_sess() end, {buffer = buf})
@@ -539,6 +571,7 @@ end
 function NVTStrategy.abort_last_task()
   local task = NVTStrategy.last_task()
   if task then
+    print('aborting last task...')
     task:stop()
     return
   end

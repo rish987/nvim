@@ -42,21 +42,25 @@ local test_leader = vim.g.StartedByNvimTask and "<C-A-x>" or "<C-x>"
 local test_leader_manual = test_leader .. test_leader
 local test_mappings = {
   restart_test = test_leader .. "r",
+  restart_test_auto = test_leader .. "R",
   restart_test_manual = test_leader_manual .. "r",
+  restart_test_headless = test_leader .. "<C-r>",
   exit_test = test_leader .. "x",
   blank_test = test_leader .. "b",
-  duplicate_test = test_leader .. "d",
   delete_test = test_leader .. "D",
-  find_test = test_leader .. "f",
+  find_test = test_leader .. "f", -- TODO make mappings in telescope instead to choose between auto/manual/headless
+  find_test_auto = test_leader .. "F",
   find_test_manual = test_leader_manual .. "f",
+  find_test_headless = test_leader .. "<C-f>",
   trace_picker = test_leader .. "t",
   edit_test = test_leader .. "e",
-  trace_test = test_leader .. "a",
+  -- trace_test = test_leader .. "a",
   toggle = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<C-Esc>"
 }
 
 local def_opts = {
-  auto = true
+  auto = true,
+  headless = false,
 }
 
 -- TODO status line indicator for current recording and keymap to clear recording
@@ -186,9 +190,14 @@ vim.keymap.set("n", test_mappings.blank_test, M.blank_sess)
 vim.keymap.set("n", test_mappings.edit_test, M.edit_curr_test)
 -- vim.keymap.set("n", test_mappings.trace_picker, M.pick_trace)
 M.restart = function(opts)
-  if strat.last_task() then
+  -- TODO get task with the same name (don't want to replace unrelated tasks)
+  local task = strat.last_task()
+  if not opts and task then
     strat.restart_last_task()
   else
+    if task then
+      task:stop()
+    end
     new_nvim_task(nil, opts)
   end
 end
@@ -196,6 +205,16 @@ vim.keymap.set("n", test_mappings.restart_test, M.restart)
 vim.keymap.set("n", test_mappings.restart_test_manual,
   function ()
     M.restart({auto = false})
+  end
+)
+vim.keymap.set("n", test_mappings.restart_test_auto,
+  function ()
+    M.restart({auto = true})
+  end
+)
+vim.keymap.set("n", test_mappings.restart_test_headless,
+  function ()
+    M.restart({headless = true})
   end
 )
 M.save_restart = function(opts)

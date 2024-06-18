@@ -17,20 +17,27 @@ return {
   name = "nvt",
   builder = function(params)
     local sockfile = get_child_sock()
+    local args = {
+      "--cmd", 'let g:StartedByNvimTask = "true"',
+      "--cmd", ('let g:NvimTaskSessionDir = "%s"'):format(db.sessiondir), -- use parent sessiondir
+      "--cmd", ('let g:NvimTaskParentSock = "%s"'):format(sock),
+      "--cmd", ('let g:NvimTaskChildSockfile = "%s"'):format(sockfile),
+      "--listen", sockfile
+    }
+    local components = {
+      "default",
+    }
+    -- if params.headless then
+    --   vim.list_extend(args, {"--embed"})
+    -- end
+    -- if params.headless then
+    --   vim.list_extend(components, {"nvt"})
+    -- end
     return {
       cmd = { "nvim" },
-      args = {
-        "--cmd", 'let g:StartedByNvimTask = "true"',
-        "--cmd", ('let g:NvimTaskSessionDir = "%s"'):format(db.sessiondir), -- use parent sessiondir
-        "--cmd", ('let g:NvimTaskParentSock = "%s"'):format(sock),
-        "--cmd", ('let g:NvimTaskChildSockfile = "%s"'):format(sockfile),
-        "--listen", sockfile
-      },
-      strategy = {"nvt", sname = params.sname, auto = params.auto, sockfile = sockfile},
-      components = {
-        -- "nvt",
-        "default",
-      },
+      args = args,
+      strategy = {"nvt", sname = params.sname, auto = params.auto, headless = params.headless, sockfile = sockfile},
+      components = components,
     }
   end,
 }
