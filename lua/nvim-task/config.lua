@@ -148,7 +148,7 @@ end
 
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = vim.schedule_wrap(function()
-    vim.fn.rpcrequest(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {sockfile})
+    vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {sockfile})
     -- now, wait for M.load_session to be called by the parent instance (after it has connected)
   end),
 })
@@ -165,6 +165,7 @@ function M.load_session(_sess)
   end
 
   vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.child_loaded_notify(...)", {sockfile})
+  -- log.warn"HERE 8"
   -- M.msgview_enable()
 end
 

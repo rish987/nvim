@@ -34,6 +34,7 @@ function NVTStrategy.new(opts)
   local new = {
     sock_waiters = {},
     child_loaded = false,
+    tries = 0,
     sname = opts.sname,
     headless = opts.headless,
     bufnr = nil,
@@ -69,7 +70,7 @@ function NVTStrategy:_reset()
 end
 
 function NVTStrategy:run_child(code, ...)
-  if not self.sock then return end
+  if not self.sock then print("ERROR: socket not set") return end
   return vim.fn.rpcrequest(self.sock, "nvim_exec_lua", code, {...})
 end
 
@@ -106,14 +107,36 @@ end
 local log = require"vim.lsp.log"
 
 function NVTStrategy.set_child_sock(sockfile)
-  local self = sockfiles_to_strats[sockfile]
-  if not self then return end
+  a.run(function ()
+    local self = sockfiles_to_strats[sockfile]
+    if not self then return end
 
-  self.sock = vim.fn.sockconnect("pipe", sockfile, {rpc = true})
+    local num_tries = 0
+    while num_tries < 10 do
+      a_util.sleep(300)
 
-  vim.defer_fn(function()
-    self:run_child("require'nvim-task.config'.load_session(...)", self.sname)
-  end, 2000)
+      local success, sock = pcall(vim.fn.sockconnect, "pipe", sockfile, {rpc = true})
+      if success then
+        self.sock = sock
+        break
+      end
+
+      num_tries = num_tries + 1
+    end
+
+    if self.sock then
+      self:run_child("require'nvim-task.config'.load_session(...)", self.sname)
+      if not self.headless then
+        self:ui_start()
+      end
+      self.tries = 0
+    elseif self.tries < 5 then
+      self.tries = self.tries + 1
+      self:restart()
+    else
+      print"ERROR: maximum RPC connection retries failed"
+    end
+  end, function() end)
 end
 
 function NVTStrategy.child_loaded_notify(sockfile)
@@ -515,7 +538,6 @@ function NVTStrategy:close()
   self.is_open = false
 
   if vim.api.nvim_win_is_valid(self.win_before) then
-    print('DBG[9]: nvt.lua:507: self.win_before=' .. vim.inspect(self.win_before))
     vim.api.nvim_set_current_win(self.win_before)
   end
   -- self.win = nvim_popup.winid
@@ -537,16 +559,17 @@ function NVTStrategy:start(task)
   -- tts.start(self, task)
   self:spawn(task)
 
+  self.task = task
+  table.insert(task_stack, task)
+
   db.set_test_metadata({curr_test = self.sname})
+end
 
-  if self.headless then return end
-
+function NVTStrategy:ui_start(task)
   self:open()
   -- TODO check that task.cmd string starts with `nvim`
 
   local buf = self.bufnr
-  self.task = task
-  table.insert(task_stack, task)
   vim.keymap.set("t", play_recording_shortcut, function() self:maybe_play_recording() end, {buffer = buf})
   vim.keymap.set("t", startstop_recording, function() self:record_toggle() end, {buffer = buf})
   vim.keymap.set("t", breakpoint_key, function() self:addBreakPoint(breakpoint_key) end, {buffer = buf})
@@ -595,12 +618,17 @@ function NVTStrategy:stop()
       break
     end
   end
-  self.layout:unmount() -- FIXME this can be nil? saw error when aborting task
+  if self.layout then
+    self.layout:unmount() -- FIXME this can be nil? saw error when aborting task
+    self.layout = nil
+  end
   self.msg_popup = nil
   self.nvim_popup = nil
-  self.layout = nil
 
-  vim.fn.jobstop(self.chan_id)
+  if self.chan_id then
+    vim.fn.jobstop(self.chan_id)
+    self.chan_id = nil
+  end
   -- self.term:close() 
   -- tts.stop(self) -- TODO close windows, delete bufs and vim.fn.stopjob()
   vim.notify(('aborted task "%s"'):format(self.sname))
