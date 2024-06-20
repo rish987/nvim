@@ -24,7 +24,7 @@ local startstop_recording = vim.g.StartedByNvimTask and "<C-A-f>" or "<C-f>"
 local breakpoint_key = vim.g.StartedByNvimTask and "<C-A-e>" or "<C-e>"
 local restart_key = vim.g.StartedByNvimTask and "<C-A-x>r" or "<C-x>r"
 local abort_key = vim.g.StartedByNvimTask and "<C-A-x>x" or "<C-x>x"
-local toggle_key = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<C-Esc>"
+local toggle_key = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<A-Esc>"
 
 local normalizeKeycodes = function(mapping)
 	return vim.fn.keytrans(vim.api.nvim_replace_termcodes(mapping, true, true, true))
@@ -580,6 +580,7 @@ function NVTStrategy:start(task)
   table.insert(task_stack, task)
 
   db.set_test_metadata({curr_test = self.sname})
+  db.set_test_metadata({curr_params = self.opts.params})
 end
 
 function NVTStrategy:ui_start(task)

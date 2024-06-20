@@ -55,10 +55,10 @@ local test_mappings = {
   trace_picker = test_leader .. "t",
   edit_test = test_leader .. "e",
   -- trace_test = test_leader .. "a",
-  toggle = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<C-Esc>"
+  toggle = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<A-Esc>"
 }
 
-local def_opts = {
+local def_params = {
   auto = true,
   headless = false,
 }
@@ -81,11 +81,17 @@ end
 --   table.insert(sock_waiters, cb)
 -- end, 1)
 
-local function _new_nvt(sname, _opts)
-  local params = vim.tbl_extend("keep", _opts or {}, def_opts)
+local function _new_nvt(sname, _params)
+  if not sname then
+    local meta = db.get_tests_metadata()
+    sname = meta.curr_test
+    if not _params then
+      _params = meta.curr_params
+    end
+  end
 
-  local curr_test = db.get_tests_metadata().curr_test
-  if not sname then sname = curr_test end
+  local params = vim.tbl_extend("keep", _params or {}, def_params)
+
   params.sname = sname
 
   if sname == "" then
@@ -107,17 +113,17 @@ local function _new_nvt(sname, _opts)
   -- _wait_sock()
 end
 
-local function _new_nvim_task(test, opts)
-  _new_nvt(test, opts)
+local function _new_nvim_task(test, params)
+  _new_nvt(test, params)
 end
 
-local function new_nvim_task(test, opts)
+local function new_nvim_task(test, params)
   a.run(function()
-    _new_nvim_task(test, opts)
+    _new_nvim_task(test, params)
   end, function() end)
 end
 
-function M.test_picker(task_opts)
+function M.test_picker(task_params)
   local actions = require "telescope.actions"
   local action_state = require "telescope.actions.state"
   local finders = require "telescope.finders"
@@ -156,7 +162,7 @@ function M.test_picker(task_opts)
           local selection = action_state.get_selected_entry()
 
           actions.close(prompt_bufnr)
-          new_nvim_task(selection.value, task_opts)
+          new_nvim_task(selection.value, task_params)
         end)
 
         return true
@@ -164,8 +170,8 @@ function M.test_picker(task_opts)
     })
 end
 
-function M.pick_test(opts)
-  local picker = M.test_picker(opts)
+function M.pick_test(params)
+  local picker = M.test_picker(params)
   if picker then picker:find() end
 end
 
@@ -189,25 +195,25 @@ vim.keymap.set("n", test_mappings.find_test_manual,
 vim.keymap.set("n", test_mappings.blank_test, M.blank_sess)
 vim.keymap.set("n", test_mappings.edit_test, M.edit_curr_test)
 
-local last_opts
+local last_params
 
 -- vim.keymap.set("n", test_mappings.trace_picker, M.pick_trace)
-M.restart = function(opts)
+M.restart = function(params)
   -- TODO get task with the same name (don't want to replace unrelated tasks)
   local task = strat.last_task()
-  if not opts then
+  if not params then
     if task then
       strat.restart_last_task()
     else
-      new_nvim_task(nil, last_opts)
+      new_nvim_task(nil, last_params)
     end
   else
     if task then
       task:stop()
     end
-    new_nvim_task(nil, opts)
+    new_nvim_task(nil, params)
   end
-  last_opts = opts
+  last_params = params
 end
 vim.keymap.set("n", test_mappings.restart_test, M.restart)
 vim.keymap.set("n", test_mappings.restart_test_manual,
@@ -225,9 +231,9 @@ vim.keymap.set("n", test_mappings.restart_test_headless,
     M.restart({headless = true})
   end
 )
-M.save_restart = function(opts)
+M.save_restart = function(params)
   vim.cmd.write()
-  M.restart(opts)
+  M.restart(params)
 end
 vim.keymap.set("n", "<leader>W", M.save_restart)
 

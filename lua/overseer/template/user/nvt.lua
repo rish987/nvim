@@ -36,7 +36,7 @@ return {
     return {
       cmd = { "nvim" },
       args = args,
-      strategy = {"nvt", sname = params.sname, auto = params.auto, headless = params.headless, sockfile = sockfile},
+      strategy = {"nvt", sname = params.sname, auto = params.auto, headless = params.headless, params = params, sockfile = sockfile},
       components = components,
     }
   end,
