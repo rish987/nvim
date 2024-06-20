@@ -188,18 +188,26 @@ vim.keymap.set("n", test_mappings.find_test_manual,
 )
 vim.keymap.set("n", test_mappings.blank_test, M.blank_sess)
 vim.keymap.set("n", test_mappings.edit_test, M.edit_curr_test)
+
+local last_opts
+
 -- vim.keymap.set("n", test_mappings.trace_picker, M.pick_trace)
 M.restart = function(opts)
   -- TODO get task with the same name (don't want to replace unrelated tasks)
   local task = strat.last_task()
-  if not opts and task then
-    strat.restart_last_task()
+  if not opts then
+    if task then
+      strat.restart_last_task()
+    else
+      new_nvim_task(nil, last_opts)
+    end
   else
     if task then
       task:stop()
     end
     new_nvim_task(nil, opts)
   end
+  last_opts = opts
 end
 vim.keymap.set("n", test_mappings.restart_test, M.restart)
 vim.keymap.set("n", test_mappings.restart_test_manual,

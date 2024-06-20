@@ -31,6 +31,8 @@ local normalizeKeycodes = function(mapping)
 end
 
 function NVTStrategy.new(opts)
+  if opts.headless then opts.auto = true end
+
   local new = {
     sock_waiters = {},
     child_loaded = false,
@@ -38,6 +40,7 @@ function NVTStrategy.new(opts)
     sname = opts.sname,
     headless = opts.headless,
     bufnr = nil,
+    messages = {},
     msg_bufnr = nil,
     chan_id = nil,
     opts = opts,
@@ -66,6 +69,7 @@ function NVTStrategy:_reset()
   self.is_open = false
   self.win_before = nil
   self.sock_waiters = {}
+  self.messages = {}
   self.child_loaded = false
 end
 
@@ -150,6 +154,10 @@ function NVTStrategy.child_loaded_notify(sockfile)
   self.sock_waiters = {}
 end
 
+function NVTStrategy:add_msg(msg)
+  table.insert(self.messages, msg)
+end
+
 function NVTStrategy.new_child_msg(sockfile, msg, error)
   local self = sockfiles_to_strats[sockfile]
   if not self then return end
@@ -158,7 +166,8 @@ function NVTStrategy.new_child_msg(sockfile, msg, error)
   -- self.task:dispatch("on_output", msg)  -- FIXME why does this get stuck?
   -- self.task:dispatch("on_output_lines", vim.split(msg, "\n"))
 
-  if self.headless then print(msg) return end
+  self:add_msg(msg)
+  if self.headless then return end
 
   -- TODO move to its own component
   local msgs_text = vim.api.nvim_buf_get_text(self.msg_bufnr, 0, 0, -1, -1, {})
@@ -437,6 +446,14 @@ function NVTStrategy:spawn(task)
 
         self:_maybe_play_recording()
         if self.finished_playback then break end
+      end
+
+      if self.headless then
+        a_util.sleep(300)
+        if #self.messages > 0 then
+          vim.notify("test messages:\n" .. vim.fn.join(self.messages, "\n") .. "\n---")
+        end
+        self:stop()
       end
     end
   end, function() end)
