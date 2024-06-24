@@ -55,7 +55,7 @@ local test_mappings = {
   trace_picker = test_leader .. "t",
   edit_test = test_leader .. "e",
   -- trace_test = test_leader .. "a",
-  toggle = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<A-Esc>"
+  toggle = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<A-l>"
 }
 
 local def_params = {
@@ -215,6 +215,7 @@ M.restart = function(params)
   end
   last_params = params
 end
+
 vim.keymap.set("n", test_mappings.restart_test, M.restart)
 vim.keymap.set("n", test_mappings.restart_test_manual,
   function ()

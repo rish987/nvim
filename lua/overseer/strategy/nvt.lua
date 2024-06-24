@@ -24,7 +24,7 @@ local startstop_recording = vim.g.StartedByNvimTask and "<C-A-f>" or "<C-f>"
 local breakpoint_key = vim.g.StartedByNvimTask and "<C-A-e>" or "<C-e>"
 local restart_key = vim.g.StartedByNvimTask and "<C-A-x>r" or "<C-x>r"
 local abort_key = vim.g.StartedByNvimTask and "<C-A-x>x" or "<C-x>x"
-local toggle_key = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<A-Esc>"
+local toggle_key = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<A-l>"
 
 local normalizeKeycodes = function(mapping)
 	return vim.fn.keytrans(vim.api.nvim_replace_termcodes(mapping, true, true, true))
@@ -42,6 +42,7 @@ function NVTStrategy.new(opts)
     bufnr = nil,
     messages = {},
     msg_bufnr = nil,
+    error_msg = nil,
     chan_id = nil,
     opts = opts,
     term = nil,
@@ -65,6 +66,7 @@ function NVTStrategy:_reset()
   self.chan_id = nil
   self.layout = nil
   self.msg_popup = nil
+  self.error_msg = nil
   self.nvim_popup = nil
   self.is_open = false
   self.win_before = nil
@@ -165,6 +167,10 @@ function NVTStrategy.new_child_msg(sockfile, msg, error)
 
   -- self.task:dispatch("on_output", msg)  -- FIXME why does this get stuck?
   -- self.task:dispatch("on_output_lines", vim.split(msg, "\n"))
+
+  if error then
+    self.error_msg = msg
+  end
 
   self:add_msg(msg)
   if self.headless then return end
@@ -437,23 +443,33 @@ function NVTStrategy:spawn(task)
       self:_sock_wait()
       local first = true
       while true do
-        -- TODO check for error and abort if so
         if not first then
           a_util.sleep(300)
         else
           first = false
         end
 
+        if self.error_msg then break end
+
         self:_maybe_play_recording()
         if self.finished_playback then break end
       end
 
+      a_util.sleep(300)
       if self.headless then
-        a_util.sleep(300)
         if #self.messages > 0 then
           vim.notify("test messages:\n" .. vim.fn.join(self.messages, "\n") .. "\n---")
         end
+        if self.error_msg then
+          if #self.rem_recording > 0 then
+            print("aborted playback because of error message:\n", self.error_msg)
+          else
+            print("got error message:\n", self.error_msg)
+          end
+        end
         self:stop()
+      else
+        if self.error_msg then print("got error message:\n", self.error_msg) end
       end
     end
   end, function() end)
@@ -649,7 +665,7 @@ function NVTStrategy:stop()
   end
   -- self.term:close() 
   -- tts.stop(self) -- TODO close windows, delete bufs and vim.fn.stopjob()
-  vim.notify(('aborted task "%s"'):format(self.sname))
+  -- vim.notify(('aborted task "%s"'):format(self.sname))
 end
 
 function NVTStrategy:dispose()

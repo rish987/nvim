@@ -14,7 +14,7 @@ return {
       },
     },
     messages = {
-      enabled = not vim.g.StartedByNvimTask
+      enabled = not vim.g.StartedByNvimTask,
     },
     cmdline = {
       enabled = true
@@ -35,9 +35,7 @@ return {
         -- options for the message history that you get with `:Noice`
         view = "split",
         opts = { enter = true, format = "details" },
-        filter = {
-          event = "msg_show",
-        },
+        filter = {},
       },
     }
   },
