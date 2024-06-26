@@ -58,6 +58,9 @@ return {
     priority = 1000,
 		config = function()
       require"bmessages".setup()
+      vim.keymap.set("n", "<leader>b", function ()
+        require("bmessages").toggle({ split_type = "vsplit", split_direction = "botright", keep_focus = true})
+      end)
       if vim.g.StartedByNvimTask then
       end
 		end,

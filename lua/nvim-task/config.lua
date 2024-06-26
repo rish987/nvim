@@ -438,17 +438,17 @@ end
 --       }] = true
 --     }
 -- }))
-
-vim.keymap.set(
-  { "n", "o", "x" },
-  "<C-p>",
-  function ()
-    -- local tbl = vim.F.pack_len("a", nil, "c")
-    -- vim.F.unpack_len(tbl)
-    require('alternate').tst()
-    print"HERE !"
-  end
-)
+--
+-- vim.keymap.set(
+--   { "n", "o", "x" },
+--   "<C-p>",
+--   function ()
+--     -- local tbl = vim.F.pack_len("a", nil, "c")
+--     -- vim.F.unpack_len(tbl)
+--     -- require('alternate').test()
+--     print"HERE 3!"
+--   end
+-- )
 
 return M
 -- TODO incremental recordings scoped to session?

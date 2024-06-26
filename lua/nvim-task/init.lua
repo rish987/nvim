@@ -253,7 +253,7 @@ vim.keymap.set(
   { "n", "o", "x" },
   "<C-n>",
   function ()
-    print"HERE !"
+    print"HERE 1!"
   end
 )
 
@@ -261,10 +261,8 @@ vim.keymap.set(
   { "n", "o", "x" },
   "<C-p>",
   function ()
-    -- local tbl = vim.F.pack_len("a", nil, "c")
-    -- vim.F.unpack_len(tbl)
-    require('alternate').tst()
-    print"HERE !"
+    -- require('alternate').test()
+    print"HERE 2!"
   end
 )
 

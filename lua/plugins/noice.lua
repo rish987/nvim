@@ -15,6 +15,10 @@ return {
     },
     messages = {
       enabled = not vim.g.StartedByNvimTask,
+      history = {
+        enabled = true,
+        view = "split", -- use a split window for history
+      },
     },
     cmdline = {
       enabled = true

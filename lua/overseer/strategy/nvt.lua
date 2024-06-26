@@ -42,10 +42,13 @@ function NVTStrategy.new(opts)
     bufnr = nil,
     messages = {},
     msg_bufnr = nil,
+    paused_recording = nil,
+    curr_split_recording = nil,
     error_msg = nil,
     chan_id = nil,
     opts = opts,
     term = nil,
+    stopped = false,
   }
 
   -- new = vim.tbl_extend("error", new, to_merge)
@@ -55,11 +58,14 @@ function NVTStrategy.new(opts)
   return setmetatable(new, { __index = NVTStrategy })
 end
 
-function NVTStrategy:_reset()
+function NVTStrategy:_reset() -- FIXME rename (not async)
   self.sock = nil
   self.data = db.get_tests_data()[self.sname] or {sess = self.sname}
-  self.split_recording = self.data.recording and vim.split(self.data.recording, normalizeKeycodes(breakpoint_key), {plain = true}) or {}
-  -- TODO the recording should come pre-split by the nvim-task.recorder module
+  self.split_recording = self.data.split_recording or (self.data.recording and vim.split(self.data.recording, normalizeKeycodes(breakpoint_key), {plain = true}) or {})
+  -- TODO remove back-compat
+  if not self.data.split_recording and self.data.recording then
+    self:set_data({split_recording = self.split_recording})
+  end
   self.rem_recording = vim.fn.copy(self.split_recording)
   self.finished_playback = false
   self.finished_playback_restart = false
@@ -67,12 +73,15 @@ function NVTStrategy:_reset()
   self.layout = nil
   self.msg_popup = nil
   self.error_msg = nil
+  self.paused_recording = nil
   self.nvim_popup = nil
+  self.curr_split_recording = nil
   self.is_open = false
   self.win_before = nil
   self.sock_waiters = {}
   self.messages = {}
   self.child_loaded = false
+  self.stopped = false
 end
 
 function NVTStrategy:run_child(code, ...)
@@ -93,21 +102,6 @@ end
 
 function NVTStrategy:get_bufnr()
   return tts.get_bufnr(self)
-end
-
-function NVTStrategy:restart()
-  -- FIXME this is a workaround for:
-  -- require"overseer".run_action(self.task, "restart")
-  -- since we need to wait for the toggleterm to properly close
-  -- so as to avoid the issue where it opens in normal mode
-  local was_open = self.is_open
-
-  self.task:stop()
-  self.task:reset()
-
-  vim.defer_fn(function() -- FIXME still need to defer?
-    self.task:start()
-  end, was_open and 100 or 0)
 end
 
 local log = require"vim.lsp.log"
@@ -201,7 +195,9 @@ function NVTStrategy.new_child_msg(sockfile, msg, error)
   end
 end
 
-local function isRecording() return vim.fn.reg_recording() ~= "" end
+function NVTStrategy:is_recording()
+  return self.curr_split_recording ~= nil
+end
 
 local function normal(cmdStr) vim.cmd.normal { cmdStr, bang = true } end
 
@@ -247,30 +243,61 @@ end
 
 local _input = a.wrap(vim.ui.input, 2)
 
+function NVTStrategy:_start_record_term()
+  a_normal("q" .. tempreg)
+end
+
+function NVTStrategy:_get_record_term(key)
+	a_normal("q")
+
+	local norm_macro = vim.api.nvim_replace_termcodes(vim.fn.keytrans(getMacro(tempreg)), true, true, true)
+  if key then
+    local decodedToggleKey = vim.api.nvim_replace_termcodes(key, true, true, true)
+    norm_macro = norm_macro:sub(1, -1 * (#decodedToggleKey + 1))
+  end
+
+  -- FIXME only replace termcodes in parts that were actually changed by keytrans (to handle edge case where "<...>" is entered in insert mode)
+  local recording = vim.fn.keytrans(norm_macro)
+
+  if self.paused_recording then
+    recording = self.paused_recording .. recording
+    self.paused_recording = nil
+  end
+
+  return recording
+end
+
+function NVTStrategy:_pause_record_term(key)
+  self.paused_recording = self:_get_record_term(key)
+end
+
+function NVTStrategy:_end_record_term(key)
+  table.insert(self.curr_split_recording, self:_get_record_term(key))
+end
+
 -- TODO add a way to auto-pause recording when terminal mode/window is left,
 -- and auto-restart (with a notification) after re-entering
-function NVTStrategy:_record_toggle()
-	if not isRecording() then
-		-- NOTE: above autocmd may have set regOverride
-		a_normal("q" .. tempreg)
-		vim.notify("Recording to [" .. tempreg .. "]…")
-    self:run_child_notify("require'nvim-task.config'.save_session()")
+function NVTStrategy:_record_toggle(key)
+	if not self:is_recording() then
+    if not self.data.split_recording then
+      self.curr_split_recording = {}
+      self:run_child_notify("require'nvim-task.config'.save_session()")
+
+      self:_start_record_term()
+      vim.notify("Started recording…")
+    else
+      vim.notify(("TODO implement recording override"))
+    end
 		return
   end
 
-	a_normal("q")
-
-	local decodedToggleKey = vim.api.nvim_replace_termcodes(startstop_recording, true, true, true)
-  -- FIXME only replace termcodes in parts that were actually changed by keytrans (to handle edge case where "<...>" is entered in insert mode)
-	local norm_macro = vim.api.nvim_replace_termcodes(vim.fn.keytrans(getMacro(tempreg)), true, true, true)
-	local recording = norm_macro:sub(1, -1 * (#decodedToggleKey + 1))
+  self:_end_record_term(key)
+  local split_recording = self.curr_split_recording
 
   local name = self.sname
   if name == require"nvim-task.config".temp_test_name then
     name = _input({ prompt = "Test name: " })
   end
-
-  vim.cmd.startinsert()
 
   if name then
     local get_session_file = require"resession.util".get_session_file
@@ -282,16 +309,21 @@ function NVTStrategy:_record_toggle()
     self:run_child_notify(("require'nvim-task.config'.record_finish(%s)"):format(name))
     self.sname = name
 
-    self:set_data({sess = name, recording = vim.fn.keytrans(recording)})
+    self:set_data({sess = name, split_recording = split_recording})
+    print('Recorded: ' .. vim.inspect(split_recording))
 
     self.finished_playback_restart = true
     vim.notify(("press '%s' to restart"):format(play_recording_shortcut))
   end
+
+  vim.cmd.startinsert()
+
+  self:_continue_recording()
 end
 
-function NVTStrategy:record_toggle()
+function NVTStrategy:record_toggle(key)
   a.run(function()
-    self:_record_toggle()
+    self:_record_toggle(key)
   end, function() end)
 end
 
@@ -318,15 +350,18 @@ function NVTStrategy:play_recording()
   return #self.rem_recording == 0
 end
 
-function NVTStrategy:_maybe_play_recording()
+function NVTStrategy:_continue_recording()
+  self.curr_split_recording = {unpack(self.data.split_recording, 1, #self.data.split_recording - 1)}
+  self.paused_recording = self.data.split_recording[#self.data.split_recording]
+  self:_start_record_term()
+end
+
+function NVTStrategy:_maybe_play_recording() -- TODO rename (not async)
   if self.rem_recording and #self.rem_recording > 0 then
     self.finished_playback = self:play_recording()
-    return true
+  else
+    self.finished_playback = true
   end
-
-  self.finished_playback = true
-
-  return false
 end
 
 function NVTStrategy:maybe_play_recording()
@@ -347,7 +382,13 @@ function NVTStrategy:maybe_play_recording()
     return
   end
 
-  if not isRecording() and self:_maybe_play_recording() then
+  if self:is_recording() then
+    self:run_child("vim.api.nvim_input(...)", play_recording_shortcut)
+    return
+  end
+
+  if self.rem_recording and #self.rem_recording > 0 then
+    self:_maybe_play_recording()
     if self.finished_playback then
       if self.trace_playback then
         vim.notify(("playback finished, press '%s' again to capture trace"):format(play_recording_shortcut))
@@ -357,16 +398,23 @@ function NVTStrategy:maybe_play_recording()
     else
       vim.notify(("hit breakpoint (%d remaining)"):format(#self.rem_recording))
     end
-    return
   end
 
-  self:run_child("vim.fn.feedkeys(vim.api.nvim_replace_termcodes(..., true, true, true))", play_recording_shortcut)
+  -- TODO put in _maybe_play_recording after async refactor
+  if self.finished_playback then
+    a.run(function()
+      self:_continue_recording()
+    end, function() end)
+  end
 end
 
 function NVTStrategy:addBreakPoint(key)
-	if isRecording() and vim.fn.reg_recording() == tempreg then
-		-- INFO nothing happens, but the key is still recorded in the macro
-		vim.notify("Macro breakpoint added.")
+	if self:is_recording() then
+    a.run(function()
+      self:_end_record_term(key)
+      vim.notify("Macro breakpoint added.")
+      self:_start_record_term()
+    end, function() end)
 	else
     vim.fn.feedkeys(vim.api.nvim_replace_termcodes(key, true, true, true), "n")
 	end
@@ -452,7 +500,11 @@ function NVTStrategy:spawn(task)
         if self.error_msg then break end
 
         self:_maybe_play_recording()
-        if self.finished_playback then break end
+        if self.finished_playback then
+          print('DBG[8]: nvt.lua:501: self=' .. vim.inspect(self.data))
+          self:_continue_recording()
+          break
+        end
       end
 
       a_util.sleep(300)
@@ -562,13 +614,24 @@ function NVTStrategy:open()
   self.msg_win = self.msg_popup.winid
 
   self.is_open = true
+
+  -- TODO make this function async and wait for terminal mode to be entered first?
+  if self:is_recording() then
+    a.run(function ()
+      self:_start_record_term()
+    end, function() end)
+  end
 end
 
-function NVTStrategy:close()
-  if not self.layout then return end
+function NVTStrategy:_close(key)
+  if not self.is_open then return end -- FIXME
+  self.is_open = false
+
+  if self:is_recording() then
+    self:_pause_record_term(key) -- FIXME make async?
+  end
 
   self.layout:hide()
-  self.is_open = false
 
   if vim.api.nvim_win_is_valid(self.win_before) then
     vim.api.nvim_set_current_win(self.win_before)
@@ -577,9 +640,15 @@ function NVTStrategy:close()
   -- self.msg_win = msg_popup.winid
 end
 
-function NVTStrategy:toggle()
+function NVTStrategy:close(key)
+  a.run(function()
+    self:_close(key)
+  end, function() end)
+end
+
+function NVTStrategy:toggle(key)
   if self.is_open then
-    self:close()
+    self:close(key)
     return
   end
 
@@ -605,11 +674,11 @@ function NVTStrategy:ui_start(task)
 
   local buf = self.bufnr
   vim.keymap.set("t", play_recording_shortcut, function() self:maybe_play_recording() end, {buffer = buf})
-  vim.keymap.set("t", startstop_recording, function() self:record_toggle() end, {buffer = buf})
+  vim.keymap.set("t", startstop_recording, function() self:record_toggle(startstop_recording) end, {buffer = buf})
   vim.keymap.set("t", breakpoint_key, function() self:addBreakPoint(breakpoint_key) end, {buffer = buf})
   vim.keymap.set("t", restart_key, function() self:restart() end, {buffer = buf})
   vim.keymap.set("t", abort_key, function() self:dispose() end, {buffer = buf})
-  vim.keymap.set("t", toggle_key, function() self:toggle() end, {buffer = buf})
+  vim.keymap.set("t", toggle_key, function() self:toggle(toggle_key) end, {buffer = buf})
   -- vim.keymap.set("t", self.opts.exit_test, function () M.abort_curr_task() end, {buffer = buf})
   -- vim.keymap.set("t", self.opts.restart_test, function () M.restart() end, {buffer = buf})
   -- vim.keymap.set("t", self.opts.blank_test, function () M.blank_sess() end, {buffer = buf})
@@ -645,17 +714,24 @@ function NVTStrategy.restart_last_task()
   vim.notify(('no tasks currently running'))
 end
 
-function NVTStrategy:stop()
+function NVTStrategy:_stop()
+  if self.stopped then return end -- FIXME figure out why this is called multiple times
+  self.stopped = true
+
+  self:_close()
+
   for i, _ in ipairs(task_stack) do
     if task_stack[i] == self.task then
       table.remove(task_stack, i)
       break
     end
   end
-  if self.layout then
-    self.layout:unmount() -- FIXME this can be nil? saw error when aborting task
+
+  if self.layout then -- FIXME
+    self.layout:unmount()
     self.layout = nil
   end
+
   self.msg_popup = nil
   self.nvim_popup = nil
 
@@ -667,6 +743,38 @@ function NVTStrategy:stop()
   -- tts.stop(self) -- TODO close windows, delete bufs and vim.fn.stopjob()
   -- vim.notify(('aborted task "%s"'):format(self.sname))
 end
+
+function NVTStrategy:stop()
+  if self.stopped then return end
+  a.run(function()
+    self:_stop()
+  end, function() end)
+end
+
+function NVTStrategy:_restart()
+  -- FIXME this is a workaround for:
+  -- require"overseer".run_action(self.task, "restart")
+  -- since we need to wait for the toggleterm to properly close
+  -- so as to avoid the issue where it opens in normal mode
+  local was_open = self.is_open
+
+  self:_stop() -- FIXME implement more robust async solution so that the call to self:stop() knows to use the async version
+  self.task:stop()
+  self.task:reset()
+
+  vim.defer_fn(function() -- FIXME still need to defer?
+    self.task:start()
+  end, was_open and 100 or 0)
+end
+
+-- FIXME use a queue for waiting async functions so that no two async runs can happen at the same time
+-- FIXME auto-generate these from async-marked functions via metatable's __index field
+function NVTStrategy:restart()
+  a.run(function()
+    self:_restart()
+  end, function() end)
+end
+
 
 function NVTStrategy:dispose()
   self:stop()
