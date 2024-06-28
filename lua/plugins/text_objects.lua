@@ -3,7 +3,7 @@ return {
 	lazy = false,
 	opts = {
     useDefaultKeymaps = true,
-    disabledKeymaps = { "g;", "gc" },
+    disabledKeymaps = { "g;", "gc", "r", "R" },
   },
   init = function ()
     vim.keymap.set({ "o", "x" }, "gp", "<cmd>lua require('various-textobjs').lastChange()<CR>")

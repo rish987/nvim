@@ -63,11 +63,30 @@ function NVTStrategy:_reset() -- FIXME rename (not async)
   self.data = db.get_tests_data()[self.sname] or {sess = self.sname}
   self.split_recording = self.data.split_recording or (self.data.recording and vim.split(self.data.recording, normalizeKeycodes(breakpoint_key), {plain = true}) or {})
   -- TODO remove back-compat
+  local new_split_recording = {}
+  local any_string = false
+  for i, keys in ipairs(self.split_recording) do
+    local keys_data
+    if type(keys) == "string" then
+      any_string = true
+      keys_data = {
+        type = "raw",
+        keys = keys,
+      }
+    else
+      keys_data = keys
+    end
+    table.insert(new_split_recording, keys_data)
+    if any_string and i ~= #self.split_recording then
+      table.insert(new_split_recording, {type = "breakpoint"})
+    end
+  end
+  self.split_recording = new_split_recording
+  -- TODO remove back-compat
   if not self.data.split_recording and self.data.recording then
     self:set_data({split_recording = self.split_recording})
   end
   self.rem_recording = vim.fn.copy(self.split_recording)
-  self.finished_playback = false
   self.finished_playback_restart = false
   self.chan_id = nil
   self.layout = nil
@@ -213,6 +232,16 @@ local function a_normal(cmdStr)
 		a_util.scheduler()
 		normal(cmdStr)
 		vim.cmd.startinsert()
+
+    local tries = 0
+    while tries < 100 do
+      local _mode = vim.fn.mode()
+      if _mode == "i" or _mode == "t" then
+        break
+      end
+      a_util.sleep(50)
+      tries = tries + 1
+    end
 	else
 		normal(cmdStr)
 	end
@@ -272,7 +301,10 @@ function NVTStrategy:_pause_record_term(key)
 end
 
 function NVTStrategy:_end_record_term(key)
-  table.insert(self.curr_split_recording, self:_get_record_term(key))
+  table.insert(self.curr_split_recording, {
+    type = "raw",
+    keys = self:_get_record_term(key)
+  })
 end
 
 -- TODO add a way to auto-pause recording when terminal mode/window is left,
@@ -328,40 +360,36 @@ function NVTStrategy:record_toggle(key)
 end
 
 function NVTStrategy:play_recording()
-  if #self.rem_recording == 0 then
-    vim.notify("no recording to play!")
-    return
-  end
+  -- if self.trace_playback and not self.already_tracing then
+  --   self:run_child("require'nvim-task.config'.calltrace_start()")
+  --   self.already_tracing = true
+  -- end
 
-  if self.trace_playback and not self.already_tracing then
-    self:run_child("require'nvim-task.config'.calltrace_start()")
-    self.already_tracing = true
-  end
-
-  local keys = self.rem_recording[1]
+  local keys_data = self.rem_recording[1]
   table.remove(self.rem_recording, 1)
 
   -- TODO does this work properly with '<' character in recording?
-  self:run_child("vim.api.nvim_input(...)", keys)
+  if keys_data.type == "raw" then
+    if keys_data.keys ~= "" then
+      self:run_child("vim.api.nvim_input(...)", keys_data.keys)
+    end
+  -- TODO API call case
+  else
+    return keys_data
+  end
   -- local to_send = vim.api.nvim_replace_termcodes(keys, true, true, true)
   -- vim.fn.chansend(self.chan_id, to_send)
   -- vim.fn.feedkeys(to_send)
-
-  return #self.rem_recording == 0
 end
 
 function NVTStrategy:_continue_recording()
+   -- TODO telescope in to find the last type=raw data, set that as the current level
   self.curr_split_recording = {unpack(self.data.split_recording, 1, #self.data.split_recording - 1)}
-  self.paused_recording = self.data.split_recording[#self.data.split_recording]
+  self.paused_recording = self.data.split_recording[#self.data.split_recording].keys
   self:_start_record_term()
 end
-
-function NVTStrategy:_maybe_play_recording() -- TODO rename (not async)
-  if self.rem_recording and #self.rem_recording > 0 then
-    self.finished_playback = self:play_recording()
-  else
-    self.finished_playback = true
-  end
+function NVTStrategy:finished_playback()
+  return not self.rem_recording or #self.rem_recording == 0
 end
 
 function NVTStrategy:maybe_play_recording()
@@ -370,7 +398,7 @@ function NVTStrategy:maybe_play_recording()
     return
   end
 
-  if self.finished_playback then
+  if self:finished_playback() then
     self.finished_playback_restart = true
     if self.trace_playback then
       local calltrace_data = self:run_child("return require'nvim-task.config'.calltrace_end()")
@@ -387,31 +415,36 @@ function NVTStrategy:maybe_play_recording()
     return
   end
 
-  if self.rem_recording and #self.rem_recording > 0 then
-    self:_maybe_play_recording()
-    if self.finished_playback then
-      if self.trace_playback then
-        vim.notify(("playback finished, press '%s' again to capture trace"):format(play_recording_shortcut))
-      else
-        vim.notify("playback finished")
+  while not self:finished_playback() do
+    local data = self:play_recording()
+    if data then
+      if data.type == "breakpoint" then
+        vim.notify(("hit breakpoint (TODO remaining)"):format(#self.rem_recording)) -- TODO show remaining number of breakpoints
+        return
       end
-    else
-      vim.notify(("hit breakpoint (%d remaining)"):format(#self.rem_recording))
     end
   end
 
-  -- TODO put in _maybe_play_recording after async refactor
-  if self.finished_playback then
-    a.run(function()
-      self:_continue_recording()
-    end, function() end)
+  if self.trace_playback then
+    vim.notify(("playback finished, press '%s' again to capture trace"):format(play_recording_shortcut))
+  else
+    vim.notify("playback finished")
   end
+
+  -- TODO put in play_recording after async refactor
+  a.run(function()
+    self:_continue_recording()
+  end, function() end)
 end
 
-function NVTStrategy:addBreakPoint(key)
+function NVTStrategy:add_breakpoint(key)
 	if self:is_recording() then
     a.run(function()
       self:_end_record_term(key)
+      table.insert(self.curr_split_recording,
+        {
+          type = "breakpoint"
+        })
       vim.notify("Macro breakpoint added.")
       self:_start_record_term()
     end, function() end)
@@ -489,23 +522,17 @@ function NVTStrategy:spawn(task)
     end
     if self.opts.auto then
       self:_sock_wait()
-      local first = true
-      while true do
-        if not first then
-          a_util.sleep(300)
-        else
-          first = false
-        end
-
+      while not self:finished_playback() do
         if self.error_msg then break end
 
-        self:_maybe_play_recording()
-        if self.finished_playback then
-          print('DBG[8]: nvt.lua:501: self=' .. vim.inspect(self.data))
-          self:_continue_recording()
-          break
+        local data = self:play_recording()
+        if data then
+          if data.type == "breakpoint" then
+            a_util.sleep(300)
+          end
         end
       end
+      self:_continue_recording()
 
       a_util.sleep(300)
       if self.headless then
@@ -675,7 +702,7 @@ function NVTStrategy:ui_start(task)
   local buf = self.bufnr
   vim.keymap.set("t", play_recording_shortcut, function() self:maybe_play_recording() end, {buffer = buf})
   vim.keymap.set("t", startstop_recording, function() self:record_toggle(startstop_recording) end, {buffer = buf})
-  vim.keymap.set("t", breakpoint_key, function() self:addBreakPoint(breakpoint_key) end, {buffer = buf})
+  vim.keymap.set("t", breakpoint_key, function() self:add_breakpoint(breakpoint_key) end, {buffer = buf})
   vim.keymap.set("t", restart_key, function() self:restart() end, {buffer = buf})
   vim.keymap.set("t", abort_key, function() self:dispose() end, {buffer = buf})
   vim.keymap.set("t", toggle_key, function() self:toggle(toggle_key) end, {buffer = buf})

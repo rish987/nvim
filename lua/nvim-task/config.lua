@@ -88,13 +88,30 @@ end
 
 if not vim.g.StartedByNvimTask then return M end
 
-local sockfile = vim.g.NvimTaskChildSockfile
+M.sockfile = vim.g.NvimTaskChildSockfile
 
-local parent_sock = vim.fn.sockconnect("pipe", vim.g.NvimTaskParentSock, {rpc = true})
+M.parent_sock = vim.fn.sockconnect("pipe", vim.g.NvimTaskParentSock, {rpc = true})
 
 vim.o.swapfile = false
 
 M.ns = vim.api.nvim_create_namespace("nvim-task")
+
+-- local keymap_orig = vim.keymap.set
+-- local keymap_id = 0
+-- vim.keymap.set = function(mode, lhs, rhs, opts)
+--   if type(rhs) == "function" then
+--     keymap_orig(mode, lhs, function ()
+--       vim.fn.rpcrequest(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.register_keymap(...)", {M.sockfile, lhs, keymap_id})
+--       -- local nvt_mapping = lhs
+--       local ret = rhs()
+--       vim.fn.rpcrequest(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.unregister_keymap(...)", {M.sockfile, keymap_id})
+--       return ret -- TODO what to do with return value?
+--     end, opts)
+--   else
+--     keymap_orig(mode, lhs, rhs, opts)
+--   end
+-- end
+
 
 vim.keymap.set("n", "<leader>xn", function ()
   print("HERE")
@@ -141,14 +158,14 @@ local function msgview_enable()
     end
 
     log.warn(sessiondir, str)
-    vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.new_child_msg(...)", {sockfile, str, is_error})
+    vim.fn.rpcnotify(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.new_child_msg(...)", {M.sockfile, str, is_error})
   end)
 end
 
 
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = vim.schedule_wrap(function()
-    vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {sockfile})
+    vim.fn.rpcnotify(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {M.sockfile})
     -- now, wait for M.load_session to be called by the parent instance (after it has connected)
   end),
 })
@@ -164,7 +181,7 @@ function M.load_session(_sess)
     sess = M.temp_test_name
   end
 
-  vim.fn.rpcnotify(parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.child_loaded_notify(...)", {sockfile})
+  vim.fn.rpcnotify(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.child_loaded_notify(...)", {M.sockfile})
   -- log.warn"HERE 8"
   -- M.msgview_enable()
 end

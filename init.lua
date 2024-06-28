@@ -53,19 +53,6 @@ vim.opt.rtp:prepend(lazypath)
 require("rooter")
 
 -- FIXME put back in nvt and move nvt init here after delaying override of traced fns
-local keymap_orig = vim.keymap.set
-vim.keymap.set = function(mode, lhs, rhs, opts)
-  if type(rhs) == "function" then
-    keymap_orig(mode, lhs, function ()
-      local nvt_mapping = lhs
-      local ret = rhs()
-      return ret
-    end, opts)
-  else
-    keymap_orig(mode, lhs, rhs, opts)
-  end
-end
-
 require("lazy").setup("plugins",
   {
     dev = {
