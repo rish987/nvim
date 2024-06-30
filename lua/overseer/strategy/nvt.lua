@@ -1,10 +1,6 @@
-local tts = require("overseer.strategy.toggleterm")
 local db = require("nvim-task.db")
 local nvt_conf = require("nvim-task.config")
 local trace = require("nvim-task.trace")
-
-local a = require"plenary.async"
-local a_util = require"plenary.async.util"
 
 local task_stack = {}
 
@@ -12,7 +8,9 @@ local function _wait_for_autocmd(cmds, callback)
 	vim.api.nvim_create_autocmd(cmds, { callback = callback, once = true })
 end
 
-local wait_for_autocmd = a.wrap(_wait_for_autocmd, 2)
+local wait_for_autocmd = function(autocmd)
+  return require"plenary.async".wrap(_wait_for_autocmd, 2)(autocmd)
+end
 
 local sockfiles_to_strats = {}
 
@@ -120,19 +118,19 @@ function NVTStrategy:reset()
 end
 
 function NVTStrategy:get_bufnr()
-  return tts.get_bufnr(self)
+  return self.bufnr
 end
 
 local log = require"vim.lsp.log"
 
 function NVTStrategy.set_child_sock(sockfile)
-  a.run(function ()
+  require"plenary.async".run(function ()
     local self = sockfiles_to_strats[sockfile]
     if not self then return end
 
     local num_tries = 0
     while num_tries < 10 do
-      a_util.sleep(300)
+      require"plenary.async.util".sleep(300)
 
       local success, sock = pcall(vim.fn.sockconnect, "pipe", sockfile, {rpc = true})
       if success then
@@ -144,10 +142,7 @@ function NVTStrategy.set_child_sock(sockfile)
     end
 
     if self.sock then
-      self:run_child("require'nvim-task.config'.load_session(...)", self.sname)
-      if not self.headless then
-        self:ui_start()
-      end
+      self:run_child_notify("require'nvim-task.config'.load_session(...)", self.sname)
       self.tries = 0
     elseif self.tries < 5 then
       self.tries = self.tries + 1
@@ -229,7 +224,7 @@ local function a_normal(cmdStr)
 		else
 			wait_for_autocmd({"TermLeave"})
 		end
-		a_util.scheduler()
+		require"plenary.async.util".scheduler()
 		normal(cmdStr)
 		vim.cmd.startinsert()
 
@@ -239,7 +234,7 @@ local function a_normal(cmdStr)
       if _mode == "i" or _mode == "t" then
         break
       end
-      a_util.sleep(50)
+      require"plenary.async.util".sleep(50)
       tries = tries + 1
     end
 	else
@@ -270,7 +265,9 @@ function NVTStrategy:get_win()
   return win
 end
 
-local _input = a.wrap(vim.ui.input, 2)
+local _input = function(opts)
+  return require"plenary.async".wrap(vim.ui.input, 2)(opts)
+end
 
 function NVTStrategy:_start_record_term()
   a_normal("q" .. tempreg)
@@ -354,7 +351,7 @@ function NVTStrategy:_record_toggle(key)
 end
 
 function NVTStrategy:record_toggle(key)
-  a.run(function()
+  require"plenary.async".run(function()
     self:_record_toggle(key)
   end, function() end)
 end
@@ -384,8 +381,13 @@ end
 
 function NVTStrategy:_continue_recording()
    -- TODO telescope in to find the last type=raw data, set that as the current level
-  self.curr_split_recording = {unpack(self.data.split_recording, 1, #self.data.split_recording - 1)}
-  self.paused_recording = self.data.split_recording[#self.data.split_recording].keys
+  if self.data.split_recording then
+    self.curr_split_recording = {unpack(self.data.split_recording, 1, #self.data.split_recording - 1)}
+    self.paused_recording = self.data.split_recording[#self.data.split_recording].keys
+  else
+    self.curr_split_recording = {}
+    self.paused_recording = ""
+  end
   self:_start_record_term()
 end
 function NVTStrategy:finished_playback()
@@ -432,14 +434,14 @@ function NVTStrategy:maybe_play_recording()
   end
 
   -- TODO put in play_recording after async refactor
-  a.run(function()
+  require"plenary.async".run(function()
     self:_continue_recording()
   end, function() end)
 end
 
 function NVTStrategy:add_breakpoint(key)
 	if self:is_recording() then
-    a.run(function()
+    require"plenary.async".run(function()
       self:_end_record_term(key)
       table.insert(self.curr_split_recording,
         {
@@ -454,7 +456,7 @@ function NVTStrategy:add_breakpoint(key)
 end
 
 function NVTStrategy:pick_trace()
-  a.run(function()
+  require"plenary.async".run(function()
     local results = self:run_child("return require'nvim-task.config'.get_traceable_fns()")
     local traced_calls = trace._trace_picker_toplevel(results, self.data.traced_calls or {})
     self:set_data({traced_calls = traced_calls})
@@ -506,13 +508,32 @@ function NVTStrategy:__sock_wait(cb)
     return
   end
 
-  table.insert(self.sock_waiters, cb)
+
+  local called = false
+
+  local new_cb = function()
+    called = true
+    return cb(true)
+  end
+
+  table.insert(self.sock_waiters, new_cb)
+  
+  vim.defer_fn(
+    function()
+      if not called then -- timeout error
+        cb(false)
+      end
+    end,
+    1000
+  )
 end
 
-NVTStrategy._sock_wait = a.wrap(NVTStrategy.__sock_wait, 2)
+NVTStrategy._sock_wait = function(self)
+  return require"plenary.async".wrap(NVTStrategy.__sock_wait, 2)(self)
+end
 
 function NVTStrategy:spawn(task)
-  a.run(function()
+  require"plenary.async".run(function()
     if self.headless then
       self:__spawn(task, true)
     else
@@ -520,21 +541,29 @@ function NVTStrategy:spawn(task)
       self.msg_bufnr = vim.api.nvim_create_buf(false, true)
       vim.api.nvim_buf_call(self.bufnr, function() self:__spawn(task) end)
     end
+    if not self:_sock_wait() then
+      vim.notify"ERROR: rpc socket connection timeout. Aborting task..."
+      -- TODO give user the option to open test session to see error
+      self:stop()
+      return
+    end
+    if not self.headless then
+      self:ui_start()
+    end
     if self.opts.auto then
-      self:_sock_wait()
       while not self:finished_playback() do
         if self.error_msg then break end
 
         local data = self:play_recording()
         if data then
           if data.type == "breakpoint" then
-            a_util.sleep(300)
+            require"plenary.async.util".sleep(300)
           end
         end
       end
       self:_continue_recording()
 
-      a_util.sleep(300)
+      require"plenary.async.util".sleep(300)
       if self.headless then
         if #self.messages > 0 then
           vim.notify("test messages:\n" .. vim.fn.join(self.messages, "\n") .. "\n---")
@@ -644,7 +673,7 @@ function NVTStrategy:open()
 
   -- TODO make this function async and wait for terminal mode to be entered first?
   if self:is_recording() then
-    a.run(function ()
+    require"plenary.async".run(function ()
       self:_start_record_term()
     end, function() end)
   end
@@ -668,7 +697,7 @@ function NVTStrategy:_close(key)
 end
 
 function NVTStrategy:close(key)
-  a.run(function()
+  require"plenary.async".run(function()
     self:_close(key)
   end, function() end)
 end
@@ -695,7 +724,7 @@ function NVTStrategy:start(task)
   db.set_test_metadata({curr_params = self.opts.params})
 end
 
-function NVTStrategy:ui_start(task)
+function NVTStrategy:ui_start()
   self:open()
   -- TODO check that task.cmd string starts with `nvim`
 
@@ -773,7 +802,7 @@ end
 
 function NVTStrategy:stop()
   if self.stopped then return end
-  a.run(function()
+  require"plenary.async".run(function()
     self:_stop()
   end, function() end)
 end
@@ -797,7 +826,7 @@ end
 -- FIXME use a queue for waiting async functions so that no two async runs can happen at the same time
 -- FIXME auto-generate these from async-marked functions via metatable's __index field
 function NVTStrategy:restart()
-  a.run(function()
+  require"plenary.async".run(function()
     self:_restart()
   end, function() end)
 end

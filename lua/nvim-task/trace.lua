@@ -1,4 +1,3 @@
-local a = require"plenary.async"
 local nvt_conf = require"nvim-task.config"
 
 local M = {}
@@ -114,6 +113,6 @@ local function __trace_picker_toplevel(results, traced_calls, cb)
   end
 end
 
-M._trace_picker_toplevel = a.wrap(__trace_picker_toplevel, 3)
+-- M._trace_picker_toplevel = require"plenary.async".wrap(__trace_picker_toplevel, 3)
 
 return M

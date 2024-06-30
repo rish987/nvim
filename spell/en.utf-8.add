@@ -87,3 +87,9 @@ Expr
 forall
 defeq
 recursors
+impredicative
+Dedukti
+axiom
+typechecks
+mathlib4
+Winterhalter

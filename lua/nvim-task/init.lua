@@ -35,7 +35,6 @@ local db = require "nvim-task.db"
 --
 -- local config_file = script_path() .. get_path_separator() .. "config.lua"
 
-local a = require"plenary.async"
 local strat = require"overseer.strategy.nvt"
 
 local test_leader = vim.g.StartedByNvimTask and "<C-A-x>" or "<C-x>"
@@ -118,7 +117,7 @@ local function _new_nvim_task(test, params)
 end
 
 local function new_nvim_task(test, params)
-  a.run(function()
+  require"plenary.async".run(function()
     _new_nvim_task(test, params)
   end, function() end)
 end

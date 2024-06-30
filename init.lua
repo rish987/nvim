@@ -52,6 +52,8 @@ vim.opt.rtp:prepend(lazypath)
 
 require("rooter")
 
+-- require("nvim-task")
+
 -- FIXME put back in nvt and move nvt init here after delaying override of traced fns
 require("lazy").setup("plugins",
   {

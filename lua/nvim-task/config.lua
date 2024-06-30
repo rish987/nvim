@@ -96,21 +96,19 @@ vim.o.swapfile = false
 
 M.ns = vim.api.nvim_create_namespace("nvim-task")
 
--- local keymap_orig = vim.keymap.set
+local keymap_orig = vim.keymap.set
 -- local keymap_id = 0
--- vim.keymap.set = function(mode, lhs, rhs, opts)
---   if type(rhs) == "function" then
---     keymap_orig(mode, lhs, function ()
---       vim.fn.rpcrequest(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.register_keymap(...)", {M.sockfile, lhs, keymap_id})
---       -- local nvt_mapping = lhs
---       local ret = rhs()
---       vim.fn.rpcrequest(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.unregister_keymap(...)", {M.sockfile, keymap_id})
---       return ret -- TODO what to do with return value?
---     end, opts)
---   else
---     keymap_orig(mode, lhs, rhs, opts)
---   end
--- end
+vim.keymap.set = function(mode, lhs, rhs, opts)
+  if type(rhs) == "function" then
+    keymap_orig(mode, lhs, function ()
+      -- vim.fn.rpcrequest(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.register_keymap(...)", {M.sockfile, lhs})
+      local ret = rhs()
+      return ret -- TODO what to do with return value?
+    end, opts)
+  else
+    keymap_orig(mode, lhs, rhs, opts)
+  end
+end
 
 
 vim.keymap.set("n", "<leader>xn", function ()
@@ -163,12 +161,16 @@ local function msgview_enable()
 end
 
 
-vim.api.nvim_create_autocmd("VimEnter", {
-  callback = vim.schedule_wrap(function()
-    vim.fn.rpcnotify(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {M.sockfile})
-    -- now, wait for M.load_session to be called by the parent instance (after it has connected)
-  end),
-})
+if vim.v.vim_did_enter then
+  vim.fn.rpcnotify(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {M.sockfile})
+else
+  vim.api.nvim_create_autocmd("VimEnter", {
+    callback = vim.schedule_wrap(function()
+      vim.fn.rpcnotify(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {M.sockfile})
+      -- now, wait for M.load_session to be called by the parent instance (after it has connected)
+    end),
+  })
+end
 
 function M.load_session(_sess)
   local startup_msgs = vim.api.nvim_cmd({ cmd = "messages" }, { output = true })
