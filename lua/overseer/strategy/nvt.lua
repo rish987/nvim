@@ -298,10 +298,14 @@ function NVTStrategy:_pause_record_term(key)
 end
 
 function NVTStrategy:_end_record_term(key)
-  table.insert(self.curr_split_recording, {
-    type = "raw",
-    keys = self:_get_record_term(key)
-  })
+  local recorded = self:_get_record_term(key)
+
+  if recorded ~= "" then
+    table.insert(self.curr_split_recording, {
+      type = "raw",
+      keys = recorded
+    })
+  end
 end
 
 -- TODO add a way to auto-pause recording when terminal mode/window is left,
@@ -439,17 +443,29 @@ function NVTStrategy:maybe_play_recording()
   end, function() end)
 end
 
+function NVTStrategy:inject_recording(key, cb)
+  local done = false
+
+  require"plenary.async".run(function()
+    self:_end_record_term(key)
+    table.insert(self.curr_split_recording, cb())
+    self:_start_record_term()
+  end, function() end)
+
+  -- block until recording again
+  -- TODO error handling for exceeding wait
+  vim.fn.wait(5000, function ()
+    return done
+  end)
+end
+
 function NVTStrategy:add_breakpoint(key)
 	if self:is_recording() then
-    require"plenary.async".run(function()
-      self:_end_record_term(key)
-      table.insert(self.curr_split_recording,
-        {
+    self:inject_recording(key, function()
+      return {
           type = "breakpoint"
-        })
-      vim.notify("Macro breakpoint added.")
-      self:_start_record_term()
-    end, function() end)
+        }
+    end)
 	else
     vim.fn.feedkeys(vim.api.nvim_replace_termcodes(key, true, true, true), "n")
 	end
@@ -550,7 +566,21 @@ function NVTStrategy:spawn(task)
     if not self.headless then
       self:ui_start()
     end
-    if self.opts.auto then
+    if self.opts.auto and self.data.split_recording then
+      local recording_string = ""
+      for i, data in ipairs(self.data.split_recording) do
+        local str
+        if data.type == "raw" then
+          str = data.keys
+        elseif data.type == "breakpoint" then
+          str = "|"
+        end
+        if i ~= #self.data.split_recording then
+          str = str .. " "
+        end
+        recording_string = recording_string .. str
+      end
+      print("playing: ".. recording_string)
       while not self:finished_playback() do
         if self.error_msg then break end
 

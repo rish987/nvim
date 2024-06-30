@@ -1,5 +1,5 @@
 return {
-  -- enabled = false,
+  enabled = false,
   'stevearc/dressing.nvim',
   opts = {},
 }
