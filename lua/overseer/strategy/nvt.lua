@@ -301,11 +301,39 @@ function NVTStrategy:_end_record_term(key)
   local recorded = self:_get_record_term(key)
 
   if recorded ~= "" then
-    table.insert(self.curr_split_recording, {
-      type = "raw",
-      keys = recorded
-    })
+    local split_recorded = vim.split(recorded, normalizeKeycodes(breakpoint_key), {plain = true}) or {}
+    for i, split in ipairs(split_recorded) do
+      if split ~= "" then
+        table.insert(self.curr_split_recording, {
+          type = "raw",
+          keys = split
+        })
+      end
+
+      if i ~= #split_recorded then
+        table.insert(self.curr_split_recording, {
+          type = "breakpoint",
+        })
+      end
+    end
   end
+end
+
+local function get_recording_string(split_recording)
+  local recording_string = ""
+  for i, data in ipairs(split_recording) do
+    local str
+    if data.type == "raw" then
+      str = data.keys
+    elseif data.type == "breakpoint" then
+      str = "╳"
+    end
+    -- if i ~= #split_recording then
+    --   str = str .. " "
+    -- end
+    recording_string = recording_string .. str
+  end
+  return recording_string
 end
 
 -- TODO add a way to auto-pause recording when terminal mode/window is left,
@@ -343,7 +371,7 @@ function NVTStrategy:_record_toggle(key)
     self.sname = name
 
     self:set_data({sess = name, split_recording = split_recording})
-    print('Recorded: ' .. vim.inspect(split_recording))
+    print('Recorded: ' .. get_recording_string(split_recording))
 
     self.finished_playback_restart = true
     vim.notify(("press '%s' to restart"):format(play_recording_shortcut))
@@ -443,29 +471,9 @@ function NVTStrategy:maybe_play_recording()
   end, function() end)
 end
 
-function NVTStrategy:inject_recording(key, cb)
-  local done = false
-
-  require"plenary.async".run(function()
-    self:_end_record_term(key)
-    table.insert(self.curr_split_recording, cb())
-    self:_start_record_term()
-  end, function() end)
-
-  -- block until recording again
-  -- TODO error handling for exceeding wait
-  vim.fn.wait(5000, function ()
-    return done
-  end)
-end
-
 function NVTStrategy:add_breakpoint(key)
 	if self:is_recording() then
-    self:inject_recording(key, function()
-      return {
-          type = "breakpoint"
-        }
-    end)
+    vim.notify("added breakpoint")
 	else
     vim.fn.feedkeys(vim.api.nvim_replace_termcodes(key, true, true, true), "n")
 	end
@@ -533,7 +541,7 @@ function NVTStrategy:__sock_wait(cb)
   end
 
   table.insert(self.sock_waiters, new_cb)
-  
+
   vim.defer_fn(
     function()
       if not called then -- timeout error
@@ -567,20 +575,7 @@ function NVTStrategy:spawn(task)
       self:ui_start()
     end
     if self.opts.auto and self.data.split_recording then
-      local recording_string = ""
-      for i, data in ipairs(self.data.split_recording) do
-        local str
-        if data.type == "raw" then
-          str = data.keys
-        elseif data.type == "breakpoint" then
-          str = "|"
-        end
-        if i ~= #self.data.split_recording then
-          str = str .. " "
-        end
-        recording_string = recording_string .. str
-      end
-      print("playing: ".. recording_string)
+      print("playing: ".. get_recording_string(self.data.split_recording))
       while not self:finished_playback() do
         if self.error_msg then break end
 
