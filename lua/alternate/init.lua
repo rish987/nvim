@@ -109,6 +109,20 @@ function M.alt_scroll(direction, speed)
   end
 end
 
+function M.alt_setview()
+  M.refresh_altwin()
+  if not altwin then return end
+
+  local buf = vim.api.nvim_get_current_buf()
+  local pos = vim.api.nvim_win_get_cursor(0)
+
+  vim.api.nvim_win_call(altwin, function()
+    vim.api.nvim_set_current_buf(buf)
+    vim.api.nvim_win_set_cursor(0, pos)
+    vim.cmd.normal("zz")
+  end)
+end
+
 function M._test()
   local _testvar = 5
   vim.api.nvim_list_wins()
@@ -125,8 +139,10 @@ vim.keymap.set("n", "<C-w><C-w>", M.alt_goto)
 
 vim.keymap.set("n", "<C-A-j>", M.alt_scroll(1))
 vim.keymap.set("n", "<C-A-k>", M.alt_scroll(-1))
+vim.keymap.set("n", "<C-A-l>", M.alt_setview)
 vim.keymap.set("n", "<C-A-g><C-A-g>", M.alt_cmd([[normal! gg]]))
 vim.keymap.set("n", "<C-A-g>g", M.alt_cmd([[normal! G]]))
+vim.keymap.set("n", "<C-A-w>c", M.alt_wincmd("c"))
 vim.keymap.set("n", "<C-A-w>c", M.alt_wincmd("c"))
 
 return M

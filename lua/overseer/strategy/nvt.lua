@@ -489,6 +489,8 @@ function NVTStrategy:pick_trace()
   end, function() end)
 end
 
+local exit_handlers = {}
+
 function NVTStrategy:__spawn(task, headless)
   local cmd = task.cmd
   if type(cmd) == "table" then
@@ -508,6 +510,12 @@ function NVTStrategy:__spawn(task, headless)
       -- on_stderr = self:__make_output_handler(self.on_stderr),
       env = task.env,
       pty = true,
+      on_exit = function()
+        local handler = exit_handlers[self.chan_id]
+        if handler then
+          handler()
+        end
+      end
       -- clear_env = self.clear_env,
     })
   else
@@ -817,9 +825,15 @@ function NVTStrategy:_stop()
   self.nvim_popup = nil
 
   if self.chan_id then
+    exit_handlers[self.chan_id] = function ()
+      vim.api.nvim_buf_delete(self.bufnr, {})
+      vim.api.nvim_buf_delete(self.msg_bufnr, {})
+    end
+
     vim.fn.jobstop(self.chan_id)
     self.chan_id = nil
   end
+
   -- self.term:close() 
   -- tts.stop(self) -- TODO close windows, delete bufs and vim.fn.stopjob()
   -- vim.notify(('aborted task "%s"'):format(self.sname))
