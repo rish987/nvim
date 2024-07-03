@@ -40,6 +40,7 @@ function NVTStrategy.new(opts)
     bufnr = nil,
     messages = {},
     msg_bufnr = nil,
+    info_bufnr = nil,
     paused_recording = nil,
     curr_split_recording = nil,
     error_msg = nil,
@@ -89,6 +90,7 @@ function NVTStrategy:_reset() -- FIXME rename (not async)
   self.chan_id = nil
   self.layout = nil
   self.msg_popup = nil
+  self.info_popup = nil
   self.error_msg = nil
   self.paused_recording = nil
   self.nvim_popup = nil
@@ -319,14 +321,14 @@ function NVTStrategy:_end_record_term(key)
   end
 end
 
-local function get_recording_string(split_recording)
+local function get_recording_string(split_recording, pos)
   local recording_string = ""
   for i, data in ipairs(split_recording) do
-    local str
+    local str = pos == i and '|' or '' -- TODO highlight to better distinguish
     if data.type == "raw" then
-      str = data.keys
+      str = str .. data.keys
     elseif data.type == "breakpoint" then
-      str = "╳"
+      str = str .. "╳"
     end
     -- if i ~= #split_recording then
     --   str = str .. " "
@@ -342,6 +344,7 @@ function NVTStrategy:_record_toggle(key)
 	if not self:is_recording() then
     if not self.data.split_recording then
       self.curr_split_recording = {}
+      self:update_info()
       self:run_child_notify("require'nvim-task.config'.save_session()")
 
       self:_start_record_term()
@@ -397,6 +400,8 @@ function NVTStrategy:play_recording()
   local keys_data = self.rem_recording[1]
   table.remove(self.rem_recording, 1)
 
+  self:update_info()
+
   -- TODO does this work properly with '<' character in recording?
   if keys_data.type == "raw" then
     if keys_data.keys ~= "" then
@@ -420,8 +425,10 @@ function NVTStrategy:_continue_recording()
     self.curr_split_recording = {}
     self.paused_recording = ""
   end
+  self:update_info()
   self:_start_record_term()
 end
+
 function NVTStrategy:finished_playback()
   return not self.rem_recording or #self.rem_recording == 0
 end
@@ -571,6 +578,7 @@ function NVTStrategy:spawn(task)
     else
       self.bufnr = vim.api.nvim_create_buf(false, false)
       self.msg_bufnr = vim.api.nvim_create_buf(false, true)
+      self.info_bufnr = vim.api.nvim_create_buf(false, true)
       vim.api.nvim_buf_call(self.bufnr, function() self:__spawn(task) end)
     end
     if not self:_sock_wait() then
@@ -582,6 +590,7 @@ function NVTStrategy:spawn(task)
     if not self.headless then
       self:ui_start()
     end
+    self:update_info()
     if self.opts.auto and self.data.split_recording then
       print("playing: ".. get_recording_string(self.data.split_recording))
       while not self:finished_playback() do
@@ -645,6 +654,15 @@ end
 -- end
 --
 
+function NVTStrategy:update_info()
+  local status = self:is_recording() and "recording..." or "-"
+  local status_str = ("status: %s"):format(status)
+
+  local breakpoint_str = ("%s"):format(get_recording_string(self.split_recording,
+    #self.split_recording - #self.rem_recording + 1))
+  vim.api.nvim_buf_set_text(self.info_bufnr, 0, 0, -1, -1, {status_str, breakpoint_str})
+end
+
 function NVTStrategy:open()
   if self.headless then
     print("TODO open headless instance?")
@@ -656,13 +674,18 @@ function NVTStrategy:open()
     local Popup = require("nui.popup")
     local Layout = require("nui.layout")
 
-    self.nvim_popup, self.msg_popup = Popup({
+    self.nvim_popup = Popup({
       enter = true,
       border = "double",
       bufnr = self.bufnr
-    }), Popup({
+    })
+    self.msg_popup = Popup({
       border = "single",
       bufnr = self.msg_bufnr
+    })
+    self.info_popup = Popup({
+      border = "single",
+      bufnr = self.info_bufnr
     })
 
     local layout = Layout(
@@ -680,7 +703,10 @@ function NVTStrategy:open()
       },
       Layout.Box({
         Layout.Box(self.nvim_popup, { size = "70%" }),
-        Layout.Box(self.msg_popup, { size = "30%" }),
+        Layout.Box({
+          Layout.Box(self.msg_popup, { size = "70%" }),
+          Layout.Box(self.info_popup, { size = "30%" })
+        }, { size = "30%",  dir = "col" }),
       }, { dir = "row" })
     )
 
@@ -828,6 +854,7 @@ function NVTStrategy:_stop()
     exit_handlers[self.chan_id] = function ()
       vim.api.nvim_buf_delete(self.bufnr, {})
       vim.api.nvim_buf_delete(self.msg_bufnr, {})
+      vim.api.nvim_buf_delete(self.info_bufnr, {})
     end
 
     vim.fn.jobstop(self.chan_id)
