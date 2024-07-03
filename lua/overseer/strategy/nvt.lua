@@ -20,9 +20,10 @@ local NVTStrategy = {}
 local play_recording_shortcut = vim.g.StartedByNvimTask and "<C-tab>" or "<tab>"
 local startstop_recording = vim.g.StartedByNvimTask and "<C-A-f>" or "<C-f>"
 local breakpoint_key = vim.g.StartedByNvimTask and "<C-A-e>" or "<C-e>"
+local manual_breakpoint_key = vim.g.StartedByNvimTask and "<C-A-q>" or "<C-q>"
 local restart_key = vim.g.StartedByNvimTask and "<C-A-x>r" or "<C-x>r"
 local abort_key = vim.g.StartedByNvimTask and "<C-A-x>x" or "<C-x>x"
-local toggle_key = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<A-l>"
+local toggle_key = vim.g.StartedByNvimTask and "<C-A-l>" or "<A-l>"
 
 local normalizeKeycodes = function(mapping)
 	return vim.fn.keytrans(vim.api.nvim_replace_termcodes(mapping, true, true, true))
@@ -48,6 +49,7 @@ function NVTStrategy.new(opts)
     opts = opts,
     term = nil,
     stopped = false,
+    playing_back = false,
   }
 
   -- new = vim.tbl_extend("error", new, to_merge)
@@ -57,10 +59,48 @@ function NVTStrategy.new(opts)
   return setmetatable(new, { __index = NVTStrategy })
 end
 
+local function bp_split(recording, bp_keys)
+  local split_recording = {}
+  local bp_key = bp_keys[1].key
+  local manual = bp_keys[1].manual
+
+  local split = vim.split(recording, normalizeKeycodes(bp_key), {plain = true})
+  for i, keys in ipairs(split) do
+    if bp_keys[2] then
+      vim.list_extend(split_recording, bp_split(keys, {unpack(bp_keys, 2)}))
+    elseif keys ~= "" then
+      table.insert(split_recording, {
+        type = "raw",
+        keys = keys,
+      })
+    end
+
+    if i ~= #split then
+      table.insert(split_recording, {
+        type = "breakpoint",
+        manual = manual,
+      })
+    end
+  end
+
+  return split_recording
+end
+
+local bp_keys = {
+  {
+    key = breakpoint_key,
+    manual = false
+  },
+  {
+    key = manual_breakpoint_key,
+    manual = true
+  },
+}
+
 function NVTStrategy:_reset() -- FIXME rename (not async)
   self.sock = nil
   self.data = db.get_tests_data()[self.sname] or {sess = self.sname}
-  self.split_recording = self.data.split_recording or (self.data.recording and vim.split(self.data.recording, normalizeKeycodes(breakpoint_key), {plain = true}) or {})
+  self.split_recording = self.data.split_recording or (self.data.recording and bp_split(self.data.recording, bp_keys) or {})
   -- TODO remove back-compat
   local new_split_recording = {}
   local any_string = false
@@ -101,6 +141,7 @@ function NVTStrategy:_reset() -- FIXME rename (not async)
   self.messages = {}
   self.child_loaded = false
   self.stopped = false
+  self.playing_back = false
 end
 
 function NVTStrategy:run_child(code, ...)
@@ -303,21 +344,7 @@ function NVTStrategy:_end_record_term(key)
   local recorded = self:_get_record_term(key)
 
   if recorded ~= "" then
-    local split_recorded = vim.split(recorded, normalizeKeycodes(breakpoint_key), {plain = true}) or {}
-    for i, split in ipairs(split_recorded) do
-      if split ~= "" then
-        table.insert(self.curr_split_recording, {
-          type = "raw",
-          keys = split
-        })
-      end
-
-      if i ~= #split_recorded then
-        table.insert(self.curr_split_recording, {
-          type = "breakpoint",
-        })
-      end
-    end
+    self.curr_split_recording = bp_split(recorded, bp_keys) or {}
   end
 end
 
@@ -456,14 +483,20 @@ function NVTStrategy:maybe_play_recording()
     return
   end
 
-  while not self:finished_playback() do
-    local data = self:play_recording()
-    if data then
-      if data.type == "breakpoint" then
-        vim.notify(("hit breakpoint (TODO remaining)"):format(#self.rem_recording)) -- TODO show remaining number of breakpoints
-        return
-      end
+  if not self:finished_playback() then
+    local waiter = self.continue_waiter
+    if waiter then
+      self.continue_waiter = nil
+      waiter()
+      return
     end
+
+    if not self.playing_back then
+      self:playback()
+    else
+      vim.notify("already playing back")
+    end
+    return
   end
 
   if self.trace_playback then
@@ -480,7 +513,12 @@ end
 
 function NVTStrategy:add_breakpoint(key)
 	if self:is_recording() then
-    vim.notify("added breakpoint")
+    vim.notify(key)
+    if key == manual_breakpoint_key then
+      vim.notify("added manual breakpoint")
+    else
+      vim.notify("added breakpoint")
+    end
 	else
     vim.fn.feedkeys(vim.api.nvim_replace_termcodes(key, true, true, true), "n")
 	end
@@ -571,6 +609,50 @@ NVTStrategy._sock_wait = function(self)
   return require"plenary.async".wrap(NVTStrategy.__sock_wait, 2)(self)
 end
 
+function NVTStrategy:__wait_continue(cb)
+  self.continue_waiter = cb
+end
+
+NVTStrategy._wait_continue = function(self)
+  return require"plenary.async".wrap(NVTStrategy.__wait_continue, 2)(self)
+end
+
+function NVTStrategy:_playback()
+  self:__playback_check()
+  while not self:finished_playback() do
+    if self.error_msg then break end
+
+    local data = self:play_recording()
+    if data then
+      if data.type == "breakpoint" then
+        if data.manual then
+          self:_wait_continue()
+        else
+          require"plenary.async.util".sleep(300)
+        end
+      end
+    end
+  end
+  self.playing_back = false
+end
+
+function NVTStrategy:__playback_check()
+  if self.playing_back then
+    vim.notify("WARN: attempted to call playback multiple times")
+    return
+  end
+  self.playing_back = true
+end
+
+
+function NVTStrategy:playback()
+  self:__playback_check()
+  require"plenary.async".run(function()
+    self:_playback()
+  end, function() end)
+end
+
+
 function NVTStrategy:spawn(task)
   require"plenary.async".run(function()
     if self.headless then
@@ -591,22 +673,12 @@ function NVTStrategy:spawn(task)
       self:ui_start()
     end
     self:update_info()
-    if self.opts.auto and self.data.split_recording then
-      print("playing: ".. get_recording_string(self.data.split_recording))
-      while not self:finished_playback() do
-        if self.error_msg then break end
-
-        local data = self:play_recording()
-        if data then
-          if data.type == "breakpoint" then
-            require"plenary.async.util".sleep(300)
-          end
-        end
-      end
+    if self.data.split_recording then
+      self:_playback()
       self:_continue_recording()
 
-      require"plenary.async.util".sleep(300)
       if self.headless then
+        require"plenary.async.util".sleep(300)
         if #self.messages > 0 then
           vim.notify("test messages:\n" .. vim.fn.join(self.messages, "\n") .. "\n---")
         end
@@ -617,42 +689,13 @@ function NVTStrategy:spawn(task)
             print("got error message:\n", self.error_msg)
           end
         end
-        self:stop()
+        self:_stop()
       else
         if self.error_msg then print("got error message:\n", self.error_msg) end
       end
     end
   end, function() end)
 end
-
--- function NVTStrategy:__check_wins()
---   if self.win then
---     if not vim.api.nvim_win_is_valid(self.win) then
---       self.win = nil
---     end
---   end
---
---   if self.msg_win then
---     if not vim.api.nvim_win_is_valid(self.msg_win) then
---       self.msg_win = nil
---     end
---   end
--- end
---
--- function NVTStrategy:__check_bufnrs()
---   if self.bufnr then
---     if not vim.api.nvim_bufnr_is_valid(self.bufnr) then
---       self.bufnr = nil
---     end
---   end
---
---   if self.msg_bufnr then
---     if not vim.api.nvim_bufnr_is_valid(self.msg_bufnr) then
---       self.msg_bufnr = nil
---     end
---   end
--- end
---
 
 function NVTStrategy:update_info()
   local status = self:is_recording() and "recording..." or "-"
@@ -692,22 +735,31 @@ function NVTStrategy:open()
       {
         anchor = "NW",
         relative = "editor",
-        position = vim.g.StartedByNvimTask and "50%" or {
+        position = {
           row = "50%",
-          col = 85
+          col = 1
         },
-        size = vim.g.StartedByNvimTask and "90%" or {
-          height = "90%",
-          width = "75%" -- FIXME negative column offset?
+        size = {
+          height = "95%",
+          width = "95%"
         },
       },
-      Layout.Box({
-        Layout.Box(self.nvim_popup, { size = "70%" }),
+      vim.g.StartedByNvimTask and
         Layout.Box({
-          Layout.Box(self.msg_popup, { size = "70%" }),
-          Layout.Box(self.info_popup, { size = "30%" })
-        }, { size = "30%",  dir = "col" }),
-      }, { dir = "row" })
+          Layout.Box(self.nvim_popup, { size = "75%" }),
+          Layout.Box({
+            Layout.Box(self.info_popup, { size = "30%" }),
+            Layout.Box(self.msg_popup, { size = "70%" }),
+          }, { size = "25%",  dir = "col" }),
+        }, { dir = "row" })
+      or
+        Layout.Box({
+          Layout.Box({
+            Layout.Box(self.info_popup, { size = "30%" }),
+            Layout.Box(self.msg_popup, { size = "70%" }),
+          }, { size = "25%",  dir = "col" }),
+          Layout.Box(self.nvim_popup, { size = "75%" }),
+        }, { dir = "row" })
     )
 
     layout:mount()
@@ -791,6 +843,7 @@ function NVTStrategy:ui_start()
   vim.keymap.set("t", play_recording_shortcut, function() self:maybe_play_recording() end, {buffer = buf})
   vim.keymap.set("t", startstop_recording, function() self:record_toggle(startstop_recording) end, {buffer = buf})
   vim.keymap.set("t", breakpoint_key, function() self:add_breakpoint(breakpoint_key) end, {buffer = buf})
+  vim.keymap.set("t", manual_breakpoint_key, function() self:add_breakpoint(manual_breakpoint_key) end, {buffer = buf})
   vim.keymap.set("t", restart_key, function() self:restart() end, {buffer = buf})
   vim.keymap.set("t", abort_key, function() self:dispose() end, {buffer = buf})
   vim.keymap.set("t", toggle_key, function() self:toggle(toggle_key) end, {buffer = buf})

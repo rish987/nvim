@@ -54,7 +54,7 @@ local test_mappings = {
   trace_picker = test_leader .. "t",
   edit_test = test_leader .. "e",
   -- trace_test = test_leader .. "a",
-  toggle = vim.g.StartedByNvimTask and "<C-A-Esc>" or "<A-l>"
+  toggle = vim.g.StartedByNvimTask and "<C-A-l>" or "<A-l>"
 }
 
 local def_params = {

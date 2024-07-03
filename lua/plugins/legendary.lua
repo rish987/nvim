@@ -29,7 +29,7 @@ return {
       -- {"<leader>yy", "<Cmd>call writefile(getreg('\"', 1, 1), \"/home/pugobat11144/temp\", \"S\")<CR>"},
       -- {"<leader>cp", "<Cmd>let @\" = expand(\"%\")<CR>"},
       {"<leader>o", "<Cmd>mes<CR>"},
-      {"<leader>N", "<Cmd>Noice<CR>"},
+      -- {"<leader>N", "<Cmd>Noice<CR>"},
       -- {"<leader>k", "<Cmd>set winfixheight<CR>"},
       {"<leader>h", "<Cmd>set winfixwidth<CR>"},
       {"<C-j>", "<C-d>"},
@@ -47,6 +47,7 @@ return {
       {"gh", "g<Tab>"},
       {"<leader>D", "<Cmd>Bdelete<CR>"},
       {"<leader>n", "/<C-p><CR>"}, -- to get around better-n when necessary
+      {"<leader>N", "?<C-p><CR>"}, -- to get around better-n when necessary
       {"<C-Tab>", "<Cmd>bn<CR>"},
       {"<C-b>", "<Cmd>bp<CR>"},
     }

@@ -3,10 +3,11 @@ return {
 	lazy = false,
 	opts = {
     useDefaultKeymaps = true,
-    disabledKeymaps = { "g;", "gc", "r", "R" },
+    disabledKeymaps = { "g;", "gc", "r" },
   },
   init = function ()
     vim.keymap.set({ "o", "x" }, "gp", "<cmd>lua require('various-textobjs').lastChange()<CR>")
+    vim.keymap.set({ "o", "x" }, "ur", '<cmd>lua require("various-textobjs").restOfParagraph("outer")<CR>')
     vim.keymap.set("n", "dsi", function()
       -- select outer indentation
       require("various-textobjs").indentation("outer", "outer")
