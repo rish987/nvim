@@ -35,19 +35,17 @@ local db = require "nvim-task.db"
 --
 -- local config_file = script_path() .. get_path_separator() .. "config.lua"
 
-local strat = require"overseer.strategy.nvt"
+local runner = require"nvim-task.runner"
 
 local test_leader = vim.g.StartedByNvimTask and "<C-A-x>" or "<C-x>"
 local test_leader_manual = test_leader .. test_leader
 local test_mappings = {
   restart_test = test_leader .. "r",
-  restart_test_auto = test_leader .. "R",
-  restart_test_manual = test_leader_manual .. "r",
   restart_test_headless = test_leader .. "<C-r>",
   exit_test = test_leader .. "x",
   blank_test = test_leader .. "b",
   delete_test = test_leader .. "D",
-  find_test = test_leader .. "f", -- TODO make mappings in telescope instead to choose between auto/manual/headless
+  find_test = test_leader .. "f", -- TODO make mappings in telescope instead to choose if headless
   find_test_auto = test_leader .. "F",
   find_test_manual = test_leader_manual .. "f",
   find_test_headless = test_leader .. "<C-f>",
@@ -57,8 +55,7 @@ local test_mappings = {
   toggle = vim.g.StartedByNvimTask and "<C-A-l>" or "<A-l>"
 }
 
-local def_params = {
-  auto = true,
+local def_opts = {
   headless = false,
 }
 
@@ -75,50 +72,47 @@ function M.edit_curr_test()
   end
 end
 
--- local _run_template = a.wrap(require"overseer".run_template, 2)
 -- local _wait_sock = a.wrap(function(cb)
 --   table.insert(sock_waiters, cb)
 -- end, 1)
 
-local function _new_nvt(sname, _params)
-  if not sname then
+local function _new_nvt(name, _opts)
+  if not name then
     local meta = db.get_tests_metadata()
-    sname = meta.curr_test
-    if not _params then
-      _params = meta.curr_params
+    name = meta.curr_test
+    if not _opts then
+      _opts = meta.curr_opts
     end
   end
 
-  local params = vim.tbl_extend("keep", _params or {}, def_params)
+  local opts = vim.tbl_extend("keep", _opts or {}, def_opts)
 
-  params.sname = sname
-
-  if sname == "" then
+  if name == "" then
     print("loading blank test")
   else
-    if db.get_tests_data()[sname] then
-      print("loading test:", sname)
+    if db.get_tests_data()[name] then
+      print("loading test:", name)
     else
-      if sname ~= nvt_conf.temp_test_name then
-        print(("WARNING: test '%s' not found; defaulting to auto-saved test session"):format(sname, nvt_conf.temp_test_name))
+      if name ~= nvt_conf.temp_test_name then
+        print(("WARNING: test '%s' not found; defaulting to auto-saved test session"):format(name, nvt_conf.temp_test_name))
       else
         print("loading auto-saved test session")
       end
-      sname = nvt_conf.temp_test_name
+      name = nvt_conf.temp_test_name
     end
   end
 
-  require"overseer".run_template({name = "nvt", params = params})
+  runner.run(name, opts)
   -- _wait_sock()
 end
 
-local function _new_nvim_task(test, params)
-  _new_nvt(test, params)
+local function _new_nvim_task(test, opts)
+  _new_nvt(test, opts)
 end
 
-local function new_nvim_task(test, params)
+local function new_nvim_task(test, opts)
   require"plenary.async".run(function()
-    _new_nvim_task(test, params)
+    _new_nvim_task(test, opts)
   end, function() end)
 end
 
@@ -184,11 +178,11 @@ function M.blank_sess()
 end
 
 -- vim.keymap.set("n", test_mappings.restart_test, M.restart)
-vim.keymap.set("n", test_mappings.exit_test, strat.abort_last_task)
+vim.keymap.set("n", test_mappings.exit_test, runner.abort_last_task)
 vim.keymap.set("n", test_mappings.find_test, M.pick_test)
 vim.keymap.set("n", test_mappings.find_test_manual,
   function ()
-    M.pick_test({auto = false})
+    M.pick_test()
   end
 )
 vim.keymap.set("n", test_mappings.blank_test, M.blank_sess)
@@ -199,10 +193,10 @@ local last_params
 -- vim.keymap.set("n", test_mappings.trace_picker, M.pick_trace)
 M.restart = function(params)
   -- TODO get task with the same name (don't want to replace unrelated tasks)
-  local task = strat.last_task()
+  local task = runner.last_task()
   if not params then
     if task then
-      strat.restart_last_task()
+      runner.restart_last_task()
     else
       new_nvim_task(nil, last_params)
     end
@@ -216,16 +210,6 @@ M.restart = function(params)
 end
 
 vim.keymap.set("n", test_mappings.restart_test, M.restart)
-vim.keymap.set("n", test_mappings.restart_test_manual,
-  function ()
-    M.restart({auto = false})
-  end
-)
-vim.keymap.set("n", test_mappings.restart_test_auto,
-  function ()
-    M.restart({auto = true})
-  end
-)
 vim.keymap.set("n", test_mappings.restart_test_headless,
   function ()
     M.restart({headless = true})
@@ -238,9 +222,9 @@ end
 vim.keymap.set("n", "<leader>W", M.save_restart)
 
 function M.toggle_curr_test()
-  local task = strat.last_task()
+  local task = runner.last_task()
   if task then
-    task.strategy:toggle()
+    task:toggle()
   else
     vim.notify(('no tasks currently running'))
   end

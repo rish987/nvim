@@ -130,6 +130,9 @@ end
 -- end)
 
 local ns = vim.api.nvim_create_namespace"NvimTask"
+local parent_notify = function(call, args)
+  vim.fn.rpcnotify(M.parent_sock, "nvim_exec_lua", "require'nvim-task.runner'." .. call, args)
+end
 
 local function msgview_enable()
   -- TODO recall that noice is a dependency because cmdline also uses the message view
@@ -156,17 +159,17 @@ local function msgview_enable()
     end
 
     log.warn(sessiondir, str)
-    vim.fn.rpcnotify(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.new_child_msg(...)", {M.sockfile, str, is_error})
+    parent_notify("new_child_msg(...)", {M.sockfile, str, is_error})
   end)
 end
 
 
 if vim.v.vim_did_enter then
-  vim.fn.rpcnotify(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {M.sockfile})
+  parent_notify("set_child_sock(...)", {M.sockfile})
 else
   vim.api.nvim_create_autocmd("VimEnter", {
     callback = vim.schedule_wrap(function()
-      vim.fn.rpcnotify(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.set_child_sock(...)", {M.sockfile})
+      parent_notify("set_child_sock(...)", {M.sockfile})
       -- now, wait for M.load_session to be called by the parent instance (after it has connected)
     end),
   })
@@ -183,7 +186,7 @@ function M.load_session(_sess)
     sess = M.temp_test_name
   end
 
-  vim.fn.rpcnotify(M.parent_sock, "nvim_exec_lua", "require'overseer.strategy.nvt'.child_loaded_notify(...)", {M.sockfile})
+  parent_notify("child_loaded_notify(...)", {M.sockfile})
   -- log.warn"HERE 8"
   -- M.msgview_enable()
 end

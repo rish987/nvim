@@ -12,9 +12,9 @@ local wait_for_autocmd = function(autocmd)
   return require"plenary.async".wrap(_wait_for_autocmd, 2)(autocmd)
 end
 
-local sockfiles_to_strats = {}
+local sockfiles_to_runners = {}
 
-local NVTStrategy = {}
+local Runner = {}
 
 -- TODO make configurable
 local play_recording_shortcut = vim.g.StartedByNvimTask and "<C-tab>" or "<tab>"
@@ -29,15 +29,24 @@ local normalizeKeycodes = function(mapping)
 	return vim.fn.keytrans(vim.api.nvim_replace_termcodes(mapping, true, true, true))
 end
 
-function NVTStrategy.new(opts)
-  if opts.headless then opts.auto = true end
+local function get_child_sock()
+  local socket_i = 0
+  local child_sock = "/tmp/nvimtasksocketchild" .. socket_i
+  while vim.fn.filereadable(child_sock) ~= 0 do
+    socket_i = socket_i + 1
+    child_sock = "/tmp/nvimtasksocketchild" .. socket_i
+  end
+  return child_sock
+end
+
+function Runner.new(name, opts)
+  local sockfile = get_child_sock()
 
   local new = {
     sock_waiters = {},
     child_loaded = false,
     tries = 0,
-    sname = opts.sname,
-    headless = opts.headless,
+    name = name,
     bufnr = nil,
     messages = {},
     msg_bufnr = nil,
@@ -50,13 +59,14 @@ function NVTStrategy.new(opts)
     term = nil,
     stopped = false,
     playing_back = false,
+    sockfile = sockfile,
   }
 
   -- new = vim.tbl_extend("error", new, to_merge)
   -- setmetatable(new, {__index = NVTStrategy})
 
-  sockfiles_to_strats[opts.sockfile] = new
-  return setmetatable(new, { __index = NVTStrategy })
+  sockfiles_to_runners[sockfile] = new
+  return setmetatable(new, { __index = Runner })
 end
 
 local function bp_split(recording, bp_keys)
@@ -97,9 +107,9 @@ local bp_keys = {
   },
 }
 
-function NVTStrategy:_reset() -- FIXME rename (not async)
+function Runner:_reset() -- FIXME rename (not async)
   self.sock = nil
-  self.data = db.get_tests_data()[self.sname] or {sess = self.sname}
+  self.data = db.get_tests_data()[self.name] or {sess = self.name}
   self.split_recording = self.data.split_recording or (self.data.recording and bp_split(self.data.recording, bp_keys) or {})
   -- TODO remove back-compat
   local new_split_recording = {}
@@ -144,31 +154,31 @@ function NVTStrategy:_reset() -- FIXME rename (not async)
   self.playing_back = false
 end
 
-function NVTStrategy:run_child(code, ...)
+function Runner:run_child(code, ...)
   if not self.sock then print("ERROR: socket not set") return end
   return vim.fn.rpcrequest(self.sock, "nvim_exec_lua", code, {...})
 end
 
-function NVTStrategy:run_child_notify(code, ...)
+function Runner:run_child_notify(code, ...)
   if not self.sock then vim.notify"ERROR: sock not set yet" return end
   vim.fn.rpcnotify(self.sock, "nvim_exec_lua", code, {...})
 end
 
-function NVTStrategy:reset()
+function Runner:reset()
   -- tts.reset(self)
 
   self:_reset()
 end
 
-function NVTStrategy:get_bufnr()
+function Runner:get_bufnr()
   return self.bufnr
 end
 
 local log = require"vim.lsp.log"
 
-function NVTStrategy.set_child_sock(sockfile)
+function Runner.set_child_sock(sockfile)
   require"plenary.async".run(function ()
-    local self = sockfiles_to_strats[sockfile]
+    local self = sockfiles_to_runners[sockfile]
     if not self then return end
 
     local num_tries = 0
@@ -185,7 +195,7 @@ function NVTStrategy.set_child_sock(sockfile)
     end
 
     if self.sock then
-      self:run_child_notify("require'nvim-task.config'.load_session(...)", self.sname)
+      self:run_child_notify("require'nvim-task.config'.load_session(...)", self.data.sess)
       self.tries = 0
     elseif self.tries < 5 then
       self.tries = self.tries + 1
@@ -196,8 +206,8 @@ function NVTStrategy.set_child_sock(sockfile)
   end, function() end)
 end
 
-function NVTStrategy.child_loaded_notify(sockfile)
-  local self = sockfiles_to_strats[sockfile]
+function Runner.child_loaded_notify(sockfile)
+  local self = sockfiles_to_runners[sockfile]
   if not self then return end
   self.child_loaded = true
 
@@ -207,12 +217,12 @@ function NVTStrategy.child_loaded_notify(sockfile)
   self.sock_waiters = {}
 end
 
-function NVTStrategy:add_msg(msg)
+function Runner:add_msg(msg)
   table.insert(self.messages, msg)
 end
 
-function NVTStrategy.new_child_msg(sockfile, msg, error)
-  local self = sockfiles_to_strats[sockfile]
+function Runner.new_child_msg(sockfile, msg, error)
+  local self = sockfiles_to_runners[sockfile]
   if not self then return end
   -- self:new_msg(msg)
 
@@ -224,7 +234,7 @@ function NVTStrategy.new_child_msg(sockfile, msg, error)
   end
 
   self:add_msg(msg)
-  if self.headless then return end
+  if self.opts.headless then return end
 
   -- TODO move to its own component
   local msgs_text = vim.api.nvim_buf_get_text(self.msg_bufnr, 0, 0, -1, -1, {})
@@ -252,7 +262,7 @@ function NVTStrategy.new_child_msg(sockfile, msg, error)
   end
 end
 
-function NVTStrategy:is_recording()
+function Runner:is_recording()
   return self.curr_split_recording ~= nil
 end
 
@@ -296,11 +306,11 @@ end
 -- TODO make configurable (and use a better default)
 local tempreg = "t"
 
-function NVTStrategy:set_data(data)
-  self.data = db.set_test_data(self.sname, data)
+function Runner:set_data(data)
+  self.data = db.set_test_data(self.name, data)
 end
 
-function NVTStrategy:get_win()
+function Runner:get_win()
   local win = self.window -- TODO set window
   -- the session may currently be un-toggled
   if not vim.api.nvim_win_is_valid(win) then return nil end
@@ -312,11 +322,11 @@ local _input = function(opts)
   return require"plenary.async".wrap(vim.ui.input, 2)(opts)
 end
 
-function NVTStrategy:_start_record_term()
+function Runner:_start_record_term()
   a_normal("q" .. tempreg)
 end
 
-function NVTStrategy:_get_record_term(key)
+function Runner:_get_record_term(key)
 	a_normal("q")
 
 	local norm_macro = vim.api.nvim_replace_termcodes(vim.fn.keytrans(getMacro(tempreg)), true, true, true)
@@ -336,15 +346,15 @@ function NVTStrategy:_get_record_term(key)
   return recording
 end
 
-function NVTStrategy:_pause_record_term(key)
+function Runner:_pause_record_term(key)
   self.paused_recording = self:_get_record_term(key)
 end
 
-function NVTStrategy:_end_record_term(key)
+function Runner:_end_record_term(key)
   local recorded = self:_get_record_term(key)
 
   if recorded ~= "" then
-    self.curr_split_recording = bp_split(recorded, bp_keys) or {}
+    self.curr_split_recording = bp_split(recorded, bp_keys)
   end
 end
 
@@ -367,7 +377,7 @@ end
 
 -- TODO add a way to auto-pause recording when terminal mode/window is left,
 -- and auto-restart (with a notification) after re-entering
-function NVTStrategy:_record_toggle(key)
+function Runner:_record_toggle(key)
 	if not self:is_recording() then
     if not self.data.split_recording then
       self.curr_split_recording = {}
@@ -385,7 +395,7 @@ function NVTStrategy:_record_toggle(key)
   self:_end_record_term(key)
   local split_recording = self.curr_split_recording
 
-  local name = self.sname
+  local name = self.name
   if name == require"nvim-task.config".temp_test_name then
     name = _input({ prompt = "Test name: " })
   end
@@ -398,7 +408,7 @@ function NVTStrategy:_record_toggle(key)
     vim.notify(("renaming session: %s to %s" ):format(saved_file, new_file))
     vim.loop.fs_rename(saved_file, new_file)
     self:run_child_notify(("require'nvim-task.config'.record_finish(%s)"):format(name))
-    self.sname = name
+    self.name = name
 
     self:set_data({sess = name, split_recording = split_recording})
     print('Recorded: ' .. get_recording_string(split_recording))
@@ -412,13 +422,13 @@ function NVTStrategy:_record_toggle(key)
   self:_continue_recording()
 end
 
-function NVTStrategy:record_toggle(key)
+function Runner:record_toggle(key)
   require"plenary.async".run(function()
     self:_record_toggle(key)
   end, function() end)
 end
 
-function NVTStrategy:play_recording()
+function Runner:play_recording()
   -- if self.trace_playback and not self.already_tracing then
   --   self:run_child("require'nvim-task.config'.calltrace_start()")
   --   self.already_tracing = true
@@ -443,7 +453,7 @@ function NVTStrategy:play_recording()
   -- vim.fn.feedkeys(to_send)
 end
 
-function NVTStrategy:_continue_recording()
+function Runner:_continue_recording()
    -- TODO telescope in to find the last type=raw data, set that as the current level
   if self.data.split_recording then
     self.curr_split_recording = {unpack(self.data.split_recording, 1, #self.data.split_recording - 1)}
@@ -456,11 +466,11 @@ function NVTStrategy:_continue_recording()
   self:_start_record_term()
 end
 
-function NVTStrategy:finished_playback()
+function Runner:finished_playback()
   return not self.rem_recording or #self.rem_recording == 0
 end
 
-function NVTStrategy:maybe_play_recording()
+function Runner:maybe_play_recording()
   if self.finished_playback_restart then
     self:restart()
     return
@@ -511,7 +521,7 @@ function NVTStrategy:maybe_play_recording()
   end, function() end)
 end
 
-function NVTStrategy:add_breakpoint(key)
+function Runner:add_breakpoint(key)
 	if self:is_recording() then
     vim.notify(key)
     if key == manual_breakpoint_key then
@@ -524,7 +534,7 @@ function NVTStrategy:add_breakpoint(key)
 	end
 end
 
-function NVTStrategy:pick_trace()
+function Runner:pick_trace()
   require"plenary.async".run(function()
     local results = self:run_child("return require'nvim-task.config'.get_traceable_fns()")
     local traced_calls = trace._trace_picker_toplevel(results, self.data.traced_calls or {})
@@ -536,24 +546,28 @@ end
 
 local exit_handlers = {}
 
-function NVTStrategy:__spawn(task, headless)
-  local cmd = task.cmd
-  if type(cmd) == "table" then
-    cmd = require"overseer.shell".escape_cmd(cmd, "strong")
+local sock = vim.call("serverstart")
+
+function Runner:__spawn()
+  local cmd = "nvim"
+  local args = {
+    "--cmd", [["let g:StartedByNvimTask = 'true'"]],
+    "--cmd", ([["let g:NvimTaskSessionDir = '%s'"]]):format(db.sessiondir), -- use parent sessiondir
+    "--cmd", ([["let g:NvimTaskParentSock = '%s'"]]):format(sock),
+    "--cmd", ([["let g:NvimTaskChildSockfile = '%s'"]]):format(self.sockfile),
+    "--listen", self.sockfile
+  }
+  for _, arg in ipairs(args) do
+    cmd = cmd .. " " .. arg
   end
-  local dir = task.cwd
-  if dir then
-    dir = vim.fn.expand(dir)
-  else
-    dir = vim.loop.cwd()
-  end
-  if headless then
+  local dir = vim.loop.cwd()
+  if self.opts.headless then
     self.chan_id = vim.fn.jobstart(cmd, { --vim.fn.split(cmd, " "), {
       cwd = dir,
       -- on_exit = __handle_exit(self),
       -- on_stdout = self:__make_output_handler(self.on_stdout),
       -- on_stderr = self:__make_output_handler(self.on_stderr),
-      env = task.env,
+      -- env = self.opts.env,
       pty = true,
       on_exit = function()
         local handler = exit_handlers[self.chan_id]
@@ -570,7 +584,7 @@ function NVTStrategy:__spawn(task, headless)
       -- on_exit = __handle_exit(self),
       -- on_stdout = self:__make_output_handler(self.on_stdout),
       -- on_stderr = self:__make_output_handler(self.on_stderr),
-      env = task.env,
+      -- env = self.opts.env,
       -- pty = true
       rpc = true
       -- clear_env = self.clear_env,
@@ -578,7 +592,7 @@ function NVTStrategy:__spawn(task, headless)
   end
 end
 
-function NVTStrategy:__sock_wait(cb)
+function Runner:__sock_wait(cb)
   -- already connected
   if self.child_loaded then
     cb()
@@ -605,19 +619,19 @@ function NVTStrategy:__sock_wait(cb)
   )
 end
 
-NVTStrategy._sock_wait = function(self)
-  return require"plenary.async".wrap(NVTStrategy.__sock_wait, 2)(self)
+Runner._sock_wait = function(self)
+  return require"plenary.async".wrap(Runner.__sock_wait, 2)(self)
 end
 
-function NVTStrategy:__wait_continue(cb)
+function Runner:__wait_continue(cb)
   self.continue_waiter = cb
 end
 
-NVTStrategy._wait_continue = function(self)
-  return require"plenary.async".wrap(NVTStrategy.__wait_continue, 2)(self)
+Runner._wait_continue = function(self)
+  return require"plenary.async".wrap(Runner.__wait_continue, 2)(self)
 end
 
-function NVTStrategy:_playback()
+function Runner:_playback()
   self:__playback_check()
   while not self:finished_playback() do
     if self.error_msg then break end
@@ -625,7 +639,7 @@ function NVTStrategy:_playback()
     local data = self:play_recording()
     if data then
       if data.type == "breakpoint" then
-        if data.manual then
+        if data.manual and not self.opts.headless then
           self:_wait_continue()
         else
           require"plenary.async.util".sleep(300)
@@ -636,7 +650,7 @@ function NVTStrategy:_playback()
   self.playing_back = false
 end
 
-function NVTStrategy:__playback_check()
+function Runner:__playback_check()
   if self.playing_back then
     vim.notify("WARN: attempted to call playback multiple times")
     return
@@ -645,7 +659,7 @@ function NVTStrategy:__playback_check()
 end
 
 
-function NVTStrategy:playback()
+function Runner:playback()
   self:__playback_check()
   require"plenary.async".run(function()
     self:_playback()
@@ -653,15 +667,15 @@ function NVTStrategy:playback()
 end
 
 
-function NVTStrategy:spawn(task)
+function Runner:spawn()
   require"plenary.async".run(function()
-    if self.headless then
-      self:__spawn(task, true)
+    if self.opts.headless then
+      self:__spawn()
     else
       self.bufnr = vim.api.nvim_create_buf(false, false)
       self.msg_bufnr = vim.api.nvim_create_buf(false, true)
       self.info_bufnr = vim.api.nvim_create_buf(false, true)
-      vim.api.nvim_buf_call(self.bufnr, function() self:__spawn(task) end)
+      vim.api.nvim_buf_call(self.bufnr, function() self:__spawn() end)
     end
     if not self:_sock_wait() then
       vim.notify"ERROR: rpc socket connection timeout. Aborting task..."
@@ -669,7 +683,7 @@ function NVTStrategy:spawn(task)
       self:stop()
       return
     end
-    if not self.headless then
+    if not self.opts.headless then
       self:ui_start()
     end
     self:update_info()
@@ -677,7 +691,7 @@ function NVTStrategy:spawn(task)
       self:_playback()
       self:_continue_recording()
 
-      if self.headless then
+      if self.opts.headless then
         require"plenary.async.util".sleep(300)
         if #self.messages > 0 then
           vim.notify("test messages:\n" .. vim.fn.join(self.messages, "\n") .. "\n---")
@@ -697,7 +711,9 @@ function NVTStrategy:spawn(task)
   end, function() end)
 end
 
-function NVTStrategy:update_info()
+function Runner:update_info()
+  if self.opts.headless then return end
+
   local status = self:is_recording() and "recording..." or "-"
   local status_str = ("status: %s"):format(status)
 
@@ -706,8 +722,8 @@ function NVTStrategy:update_info()
   vim.api.nvim_buf_set_text(self.info_bufnr, 0, 0, -1, -1, {status_str, breakpoint_str})
 end
 
-function NVTStrategy:open()
-  if self.headless then
+function Runner:open()
+  if self.opts.headless then
     print("TODO open headless instance?")
     return
   end
@@ -790,7 +806,7 @@ function NVTStrategy:open()
   end
 end
 
-function NVTStrategy:_close(key)
+function Runner:_close(key)
   if not self.is_open then return end -- FIXME
   self.is_open = false
 
@@ -807,13 +823,13 @@ function NVTStrategy:_close(key)
   -- self.msg_win = msg_popup.winid
 end
 
-function NVTStrategy:close(key)
+function Runner:close(key)
   require"plenary.async".run(function()
     self:_close(key)
   end, function() end)
 end
 
-function NVTStrategy:toggle(key)
+function Runner:toggle(key)
   if self.is_open then
     self:close(key)
     return
@@ -822,20 +838,19 @@ function NVTStrategy:toggle(key)
   self:open()
 end
 
-function NVTStrategy:start(task)
+function Runner:start()
   self:_reset()
 
   -- tts.start(self, task)
-  self:spawn(task)
+  self:spawn()
 
-  self.task = task
-  table.insert(task_stack, task)
+  table.insert(task_stack, self)
 
-  db.set_test_metadata({curr_test = self.sname})
-  db.set_test_metadata({curr_params = self.opts.params})
+  db.set_test_metadata({curr_test = self.name})
+  db.set_test_metadata({curr_opts = self.opts})
 end
 
-function NVTStrategy:ui_start()
+function Runner:ui_start()
   self:open()
   -- TODO check that task.cmd string starts with `nvim`
 
@@ -845,7 +860,7 @@ function NVTStrategy:ui_start()
   vim.keymap.set("t", breakpoint_key, function() self:add_breakpoint(breakpoint_key) end, {buffer = buf})
   vim.keymap.set("t", manual_breakpoint_key, function() self:add_breakpoint(manual_breakpoint_key) end, {buffer = buf})
   vim.keymap.set("t", restart_key, function() self:restart() end, {buffer = buf})
-  vim.keymap.set("t", abort_key, function() self:dispose() end, {buffer = buf})
+  vim.keymap.set("t", abort_key, function() self:stop() end, {buffer = buf})
   vim.keymap.set("t", toggle_key, function() self:toggle(toggle_key) end, {buffer = buf})
   -- vim.keymap.set("t", self.opts.exit_test, function () M.abort_curr_task() end, {buffer = buf})
   -- vim.keymap.set("t", self.opts.restart_test, function () M.restart() end, {buffer = buf})
@@ -854,16 +869,16 @@ function NVTStrategy:ui_start()
   -- vim.keymap.set("t", self.opts.trace_test, function () M.restart_trace() end, {buffer = buf})
 end
 
-function NVTStrategy.get_task_stack()
+function Runner.get_task_stack()
   return task_stack
 end
 
-function NVTStrategy.last_task()
+function Runner.last_task()
   return task_stack[#task_stack]
 end
 
-function NVTStrategy.abort_last_task()
-  local task = NVTStrategy.last_task()
+function Runner.abort_last_task()
+  local task = Runner.last_task()
   if task then
     print('aborting last task...')
     task:stop()
@@ -872,24 +887,24 @@ function NVTStrategy.abort_last_task()
   vim.notify(('no tasks currently running'))
 end
 
-function NVTStrategy.restart_last_task()
-  local task = NVTStrategy.last_task()
+function Runner.restart_last_task()
+  local task = Runner.last_task()
   if task then
-    task.strategy:restart()
-    vim.notify(('restarted task "%s"'):format(task.strategy.sname))
+    task:restart()
+    vim.notify(('restarted task "%s"'):format(task.name))
     return
   end
   vim.notify(('no tasks currently running'))
 end
 
-function NVTStrategy:_stop()
+function Runner:_stop()
   if self.stopped then return end -- FIXME figure out why this is called multiple times
   self.stopped = true
 
   self:_close()
 
   for i, _ in ipairs(task_stack) do
-    if task_stack[i] == self.task then
+    if task_stack[i] == self then
       table.remove(task_stack, i)
       break
     end
@@ -916,17 +931,17 @@ function NVTStrategy:_stop()
 
   -- self.term:close() 
   -- tts.stop(self) -- TODO close windows, delete bufs and vim.fn.stopjob()
-  -- vim.notify(('aborted task "%s"'):format(self.sname))
+  -- vim.notify(('aborted task "%s"'):format(self.name))
 end
 
-function NVTStrategy:stop()
+function Runner:stop()
   if self.stopped then return end
   require"plenary.async".run(function()
     self:_stop()
   end, function() end)
 end
 
-function NVTStrategy:_restart()
+function Runner:_restart()
   -- FIXME this is a workaround for:
   -- require"overseer".run_action(self.task, "restart")
   -- since we need to wait for the toggleterm to properly close
@@ -934,26 +949,25 @@ function NVTStrategy:_restart()
   local was_open = self.is_open
 
   self:_stop() -- FIXME implement more robust async solution so that the call to self:stop() knows to use the async version
-  self.task:stop()
-  self.task:reset()
+  self:reset()
 
   vim.defer_fn(function() -- FIXME still need to defer?
-    self.task:start()
+    self:start()
   end, was_open and 100 or 0)
 end
 
 -- FIXME use a queue for waiting async functions so that no two async runs can happen at the same time
 -- FIXME auto-generate these from async-marked functions via metatable's __index field
-function NVTStrategy:restart()
+function Runner:restart()
   require"plenary.async".run(function()
     self:_restart()
   end, function() end)
 end
 
-
-function NVTStrategy:dispose()
-  self:stop()
-  -- tts.dispose(self)
+function Runner.run(name, opts)
+  local runner = Runner.new(name, opts)
+  runner:start()
+  return runner
 end
 
-return NVTStrategy
+return Runner
