@@ -1,6 +1,7 @@
 local db = require("nvim-task.db")
 local nvt_conf = require("nvim-task.config")
 local trace = require("nvim-task.trace")
+local runner = require("nvim-task.runner")
 
 local task_stack = {}
 
@@ -12,60 +13,33 @@ local wait_for_autocmd = function(autocmd)
   return require"plenary.async".wrap(_wait_for_autocmd, 2)(autocmd)
 end
 
-local sockfiles_to_runners = {}
-
 local IRunner = {}
 
 -- TODO make configurable
 local play_recording_shortcut = vim.g.StartedByNvimTask and "<C-tab>" or "<tab>"
-local startstop_recording = vim.g.StartedByNvimTask and "<C-A-f>" or "<C-f>"
-local breakpoint_key = vim.g.StartedByNvimTask and "<C-A-e>" or "<C-e>"
-local manual_breakpoint_key = vim.g.StartedByNvimTask and "<C-A-q>" or "<C-q>"
-local restart_key = vim.g.StartedByNvimTask and "<C-A-x>r" or "<C-x>r"
-local abort_key = vim.g.StartedByNvimTask and "<C-A-x>x" or "<C-x>x"
-local toggle_key = vim.g.StartedByNvimTask and "<C-A-l>" or "<A-l>"
+local startstop_recording     = vim.g.StartedByNvimTask and "<C-A-f>" or "<C-f>"
+local breakpoint_key          = vim.g.StartedByNvimTask and "<C-A-e>" or "<C-e>"
+local manual_breakpoint_key   = vim.g.StartedByNvimTask and "<C-A-q>" or "<C-q>"
+local restart_key             = vim.g.StartedByNvimTask and "<C-A-x>r" or "<C-x>r"
+local abort_key               = vim.g.StartedByNvimTask and "<C-A-x>x" or "<C-x>x"
+local toggle_key              = vim.g.StartedByNvimTask and "<C-A-l>" or "<A-l>"
 
 local normalizeKeycodes = function(mapping)
 	return vim.fn.keytrans(vim.api.nvim_replace_termcodes(mapping, true, true, true))
 end
 
-local function get_child_sock()
-  local socket_i = 0
-  local child_sock = "/tmp/nvimtasksocketchild" .. socket_i
-  while vim.fn.filereadable(child_sock) ~= 0 do
-    socket_i = socket_i + 1
-    child_sock = "/tmp/nvimtasksocketchild" .. socket_i
-  end
-  return child_sock
-end
-
 function IRunner.new(name, opts)
-  local sockfile = get_child_sock()
-
   local new = {
-    sock_waiters = {},
-    child_loaded = false,
-    tries = 0,
     name = name,
     bufnr = nil,
-    messages = {},
     msg_bufnr = nil,
     info_bufnr = nil,
     paused_recording = nil,
-    curr_split_recording = nil,
-    error_msg = nil,
-    chan_id = nil,
     opts = opts,
     term = nil,
-    stopped = false,
-    playing_back = false,
-    sockfile = sockfile,
+    runner = nil,
   }
 
-  -- new = vim.tbl_extend("error", new, to_merge)
-  -- setmetatable(new, {__index = NVTStrategy})
-
-  sockfiles_to_runners[sockfile] = new
   return setmetatable(new, { __index = IRunner })
 end
 
@@ -108,65 +82,19 @@ local bp_keys = {
 }
 
 function IRunner:_reset() -- FIXME rename (not async)
-  self.sock = nil
   self.data = db.get_tests_data()[self.name] or {sess = self.name}
-  self.split_recording = self.data.split_recording or (self.data.recording and bp_split(self.data.recording, bp_keys) or {})
-  -- TODO remove back-compat
-  local new_split_recording = {}
-  local any_string = false
-  for i, keys in ipairs(self.split_recording) do
-    local keys_data
-    if type(keys) == "string" then
-      any_string = true
-      keys_data = {
-        type = "raw",
-        keys = keys,
-      }
-    else
-      keys_data = keys
-    end
-    table.insert(new_split_recording, keys_data)
-    if any_string and i ~= #self.split_recording then
-      table.insert(new_split_recording, {type = "breakpoint"})
-    end
-  end
-  self.split_recording = new_split_recording
-  -- TODO remove back-compat
-  if not self.data.split_recording and self.data.recording then
-    self:set_data({split_recording = self.split_recording})
-  end
-  self.rem_recording = vim.fn.copy(self.split_recording)
-  self.finished_playback_restart = false
-  self.chan_id = nil
   self.layout = nil
   self.msg_popup = nil
   self.info_popup = nil
-  self.error_msg = nil
   self.paused_recording = nil
   self.nvim_popup = nil
   self.curr_split_recording = nil
   self.is_open = false
   self.win_before = nil
-  self.sock_waiters = {}
-  self.messages = {}
-  self.child_loaded = false
-  self.stopped = false
-  self.playing_back = false
-end
-
-function IRunner:run_child(code, ...)
-  if not self.sock then print("ERROR: socket not set") return end
-  return vim.fn.rpcrequest(self.sock, "nvim_exec_lua", code, {...})
-end
-
-function IRunner:run_child_notify(code, ...)
-  if not self.sock then vim.notify"ERROR: sock not set yet" return end
-  vim.fn.rpcnotify(self.sock, "nvim_exec_lua", code, {...})
+  self.runner = nil
 end
 
 function IRunner:reset()
-  -- tts.reset(self)
-
   self:_reset()
 end
 
@@ -175,92 +103,6 @@ function IRunner:get_bufnr()
 end
 
 local log = require"vim.lsp.log"
-
-function IRunner.set_child_sock(sockfile)
-  require"plenary.async".run(function ()
-    local self = sockfiles_to_runners[sockfile]
-    if not self then return end
-
-    local num_tries = 0
-    while num_tries < 10 do
-      require"plenary.async.util".sleep(300)
-
-      local success, sock = pcall(vim.fn.sockconnect, "pipe", sockfile, {rpc = true})
-      if success then
-        self.sock = sock
-        break
-      end
-
-      num_tries = num_tries + 1
-    end
-
-    if self.sock then
-      self:run_child_notify("require'nvim-task.config'.load_session(...)", self.data.sess)
-      self.tries = 0
-    elseif self.tries < 5 then
-      self.tries = self.tries + 1
-      self:restart()
-    else
-      print"ERROR: maximum RPC connection retries failed"
-    end
-  end, function() end)
-end
-
-function IRunner.child_loaded_notify(sockfile)
-  local self = sockfiles_to_runners[sockfile]
-  if not self then return end
-  self.child_loaded = true
-
-  for _, cb in ipairs(self.sock_waiters) do
-    cb()
-  end
-  self.sock_waiters = {}
-end
-
-function IRunner:add_msg(msg)
-  table.insert(self.messages, msg)
-end
-
-function IRunner.new_child_msg(sockfile, msg, error)
-  local self = sockfiles_to_runners[sockfile]
-  if not self then return end
-  -- self:new_msg(msg)
-
-  -- self.task:dispatch("on_output", msg)  -- FIXME why does this get stuck?
-  -- self.task:dispatch("on_output_lines", vim.split(msg, "\n"))
-
-  if error then
-    self.error_msg = msg
-  end
-
-  self:add_msg(msg)
-  if self.opts.headless then return end
-
-  -- TODO move to its own component
-  local msgs_text = vim.api.nvim_buf_get_text(self.msg_bufnr, 0, 0, -1, -1, {})
-  local num_lines = #msgs_text
-  local last_line_length = #msgs_text[num_lines]
-  local msgwin = self.msg_popup.winid
-
-  local cursorpos
-  if msgwin then
-    cursorpos = vim.api.nvim_win_get_cursor(msgwin)
-  end
-
-  local split_msg = vim.split(msg, "\n")
-
-  local new_text = last_line_length == 0 and split_msg or {"", unpack(split_msg)}
-  vim.api.nvim_buf_set_text(self.msg_bufnr, num_lines - 1, last_line_length, num_lines - 1, last_line_length, new_text)
-
-  if msgwin then
-    local at_bottom = cursorpos[1] == num_lines
-
-    -- autoscroll
-    if at_bottom then
-      vim.fn.win_execute(msgwin, "normal! G")
-    end
-  end
-end
 
 function IRunner:is_recording()
   return self.curr_split_recording ~= nil
@@ -413,7 +255,6 @@ function IRunner:_record_toggle(key)
     self:set_data({sess = name, split_recording = split_recording})
     print('Recorded: ' .. get_recording_string(split_recording))
 
-    self.finished_playback_restart = true
     vim.notify(("press '%s' to restart"):format(play_recording_shortcut))
   end
 
@@ -454,7 +295,7 @@ function IRunner:play_recording()
 end
 
 function IRunner:_continue_recording()
-   -- TODO telescope in to find the last type=raw data, set that as the current level
+  -- TODO telescope in to find the last type=raw data, set that as the current level
   if self.data.split_recording then
     self.curr_split_recording = {unpack(self.data.split_recording, 1, #self.data.split_recording - 1)}
     self.paused_recording = self.data.split_recording[#self.data.split_recording].keys
@@ -464,61 +305,6 @@ function IRunner:_continue_recording()
   end
   self:update_info()
   self:_start_record_term()
-end
-
-function IRunner:finished_playback()
-  return not self.rem_recording or #self.rem_recording == 0
-end
-
-function IRunner:maybe_play_recording()
-  if self.finished_playback_restart then
-    self:restart()
-    return
-  end
-
-  if self:finished_playback() then
-    self.finished_playback_restart = true
-    if self.trace_playback then
-      local calltrace_data = self:run_child("return require'nvim-task.config'.calltrace_end()")
-      self:set_data({calltrace = calltrace_data})
-      -- make_test(curr_test)
-    end
-
-    vim.notify(("press '%s' again to restart"):format(play_recording_shortcut))
-    return
-  end
-
-  if self:is_recording() then
-    self:run_child("vim.api.nvim_input(...)", play_recording_shortcut)
-    return
-  end
-
-  if not self:finished_playback() then
-    local waiter = self.continue_waiter
-    if waiter then
-      self.continue_waiter = nil
-      waiter()
-      return
-    end
-
-    if not self.playing_back then
-      self:playback()
-    else
-      vim.notify("already playing back")
-    end
-    return
-  end
-
-  if self.trace_playback then
-    vim.notify(("playback finished, press '%s' again to capture trace"):format(play_recording_shortcut))
-  else
-    vim.notify("playback finished")
-  end
-
-  -- TODO put in play_recording after async refactor
-  require"plenary.async".run(function()
-    self:_continue_recording()
-  end, function() end)
 end
 
 function IRunner:add_breakpoint(key)
@@ -534,179 +320,19 @@ function IRunner:add_breakpoint(key)
 	end
 end
 
-function IRunner:pick_trace()
-  require"plenary.async".run(function()
-    local results = self:run_child("return require'nvim-task.config'.get_traceable_fns()")
-    local traced_calls = trace._trace_picker_toplevel(results, self.data.traced_calls or {})
-    self:set_data({traced_calls = traced_calls})
-    self:run_child("return require'nvim-task.config'.add_trace_wrappers(...)", nvt_conf.get_whitelist(traced_calls))
-    -- self.term:open() -- TODO
-  end, function() end)
-end
-
-local exit_handlers = {}
-
-local sock = vim.call("serverstart")
-
-function IRunner:__spawn()
-  local cmd = "nvim"
-  local args = {
-    "--cmd", [["let g:StartedByNvimTask = 'true'"]],
-    "--cmd", ([["let g:NvimTaskSessionDir = '%s'"]]):format(db.sessiondir), -- use parent sessiondir
-    "--cmd", ([["let g:NvimTaskParentSock = '%s'"]]):format(sock),
-    "--cmd", ([["let g:NvimTaskChildSockfile = '%s'"]]):format(self.sockfile),
-    "--listen", self.sockfile
-  }
-  for _, arg in ipairs(args) do
-    cmd = cmd .. " " .. arg
-  end
-  local dir = vim.loop.cwd()
-  if self.opts.headless then
-    self.chan_id = vim.fn.jobstart(cmd, { --vim.fn.split(cmd, " "), {
-      cwd = dir,
-      -- on_exit = __handle_exit(self),
-      -- on_stdout = self:__make_output_handler(self.on_stdout),
-      -- on_stderr = self:__make_output_handler(self.on_stderr),
-      -- env = self.opts.env,
-      pty = true,
-      on_exit = function()
-        local handler = exit_handlers[self.chan_id]
-        if handler then
-          handler()
-        end
-      end
-      -- clear_env = self.clear_env,
-    })
-  else
-    self.chan_id = vim.fn.termopen(cmd, {
-      detach = 1,
-      cwd = dir,
-      -- on_exit = __handle_exit(self),
-      -- on_stdout = self:__make_output_handler(self.on_stdout),
-      -- on_stderr = self:__make_output_handler(self.on_stderr),
-      -- env = self.opts.env,
-      -- pty = true
-      rpc = true
-      -- clear_env = self.clear_env,
-    })
-  end
-end
-
-function IRunner:__sock_wait(cb)
-  -- already connected
-  if self.child_loaded then
-    cb()
-    return
-  end
-
-
-  local called = false
-
-  local new_cb = function()
-    called = true
-    return cb(true)
-  end
-
-  table.insert(self.sock_waiters, new_cb)
-
-  vim.defer_fn(
-    function()
-      if not called then -- timeout error
-        cb(false)
-      end
-    end,
-    1000
-  )
-end
-
-IRunner._sock_wait = function(self)
-  return require"plenary.async".wrap(IRunner.__sock_wait, 2)(self)
-end
-
-function IRunner:__wait_continue(cb)
-  self.continue_waiter = cb
-end
-
-IRunner._wait_continue = function(self)
-  return require"plenary.async".wrap(IRunner.__wait_continue, 2)(self)
-end
-
-function IRunner:_playback()
-  self:__playback_check()
-  while not self:finished_playback() do
-    if self.error_msg then break end
-
-    local data = self:play_recording()
-    if data then
-      if data.type == "breakpoint" then
-        if data.manual and not self.opts.headless then
-          self:_wait_continue()
-        else
-          require"plenary.async.util".sleep(300)
-        end
-      end
-    end
-  end
-  self.playing_back = false
-end
-
-function IRunner:__playback_check()
-  if self.playing_back then
-    vim.notify("WARN: attempted to call playback multiple times")
-    return
-  end
-  self.playing_back = true
-end
-
-
-function IRunner:playback()
-  self:__playback_check()
-  require"plenary.async".run(function()
-    self:_playback()
-  end, function() end)
-end
-
-
 function IRunner:spawn()
   require"plenary.async".run(function()
-    if self.opts.headless then
-      self:__spawn()
-    else
-      self.bufnr = vim.api.nvim_create_buf(false, false)
-      self.msg_bufnr = vim.api.nvim_create_buf(false, true)
-      self.info_bufnr = vim.api.nvim_create_buf(false, true)
-      vim.api.nvim_buf_call(self.bufnr, function() self:__spawn() end)
-    end
-    if not self:_sock_wait() then
-      vim.notify"ERROR: rpc socket connection timeout. Aborting task..."
-      -- TODO give user the option to open test session to see error
-      self:stop()
-      return
-    end
-    if not self.opts.headless then
-      self:ui_start()
-    end
+    self.bufnr = vim.api.nvim_create_buf(false, false)
+    self.msg_bufnr = vim.api.nvim_create_buf(false, true)
+    self.info_bufnr = vim.api.nvim_create_buf(false, true)
+    self:ui_start()
     self:update_info()
+    self.runner = runner.new(self.data, {bufnr = self.bufnr})
     if self.data.split_recording then
       self:_playback()
       self:_continue_recording()
 
-      if self.opts.headless then
-        require"plenary.async.util".sleep(300)
-        if #self.messages > 0 then
-          vim.notify("test messages:\n" .. vim.fn.join(self.messages, "\n") .. "\n---")
-        end
-        if self.error_msg then
-          if #self.rem_recording > 0 then
-            print("aborted playback because of error message:\n", self.error_msg)
-          else
-            print("got error message:\n", self.error_msg)
-          end
-        end
-        self:_stop()
-      else
-        if self.error_msg then print("got error message:\n", self.error_msg) end
-      end
+      if self.runner.error_msg then print("got error message:\n", self.error_msg) end
     end
   end, function() end)
 end
@@ -855,7 +481,6 @@ function IRunner:ui_start()
   -- TODO check that task.cmd string starts with `nvim`
 
   local buf = self.bufnr
-  vim.keymap.set("t", play_recording_shortcut, function() self:maybe_play_recording() end, {buffer = buf})
   vim.keymap.set("t", startstop_recording, function() self:record_toggle(startstop_recording) end, {buffer = buf})
   vim.keymap.set("t", breakpoint_key, function() self:add_breakpoint(breakpoint_key) end, {buffer = buf})
   vim.keymap.set("t", manual_breakpoint_key, function() self:add_breakpoint(manual_breakpoint_key) end, {buffer = buf})

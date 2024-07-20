@@ -178,15 +178,15 @@ function M.blank_sess()
 end
 
 -- vim.keymap.set("n", test_mappings.restart_test, M.restart)
-vim.keymap.set("n", test_mappings.exit_test, runner.abort_last_task)
-vim.keymap.set("n", test_mappings.find_test, M.pick_test)
-vim.keymap.set("n", test_mappings.find_test_manual,
-  function ()
-    M.pick_test()
-  end
-)
-vim.keymap.set("n", test_mappings.blank_test, M.blank_sess)
-vim.keymap.set("n", test_mappings.edit_test, M.edit_curr_test)
+-- vim.keymap.set("n", test_mappings.exit_test, runner.abort_last_task)
+-- vim.keymap.set("n", test_mappings.find_test, M.pick_test)
+-- vim.keymap.set("n", test_mappings.find_test_manual,
+--   function ()
+--     M.pick_test()
+--   end
+-- )
+-- vim.keymap.set("n", test_mappings.blank_test, M.blank_sess)
+-- vim.keymap.set("n", test_mappings.edit_test, M.edit_curr_test)
 
 local last_params
 
