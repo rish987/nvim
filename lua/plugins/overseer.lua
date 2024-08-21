@@ -6,7 +6,7 @@ return {
         wrap = false
       }
     },
-    templates = {"builtin", "user.nvt"},
+    templates = {"builtin"},
     -- strategy = {
     --   "toggleterm",
     --   close_on_exit = false,

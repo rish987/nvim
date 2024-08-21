@@ -245,6 +245,7 @@ vim.cmd([[
 
   set mouse=a
   set undofile
+  set formatoptions+=cro
 
   " nnoremap gp `[v`]
 ]])
