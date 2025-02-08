@@ -218,6 +218,9 @@ vim.keymap.set("n", "<leader>v", function ()
     end
   end
 end)
+vim.keymap.set("n", "<leader>dt", function ()
+  vim.cmd("'<,'>s/dbg_/t/g")
+end)
 
 vim.o.shada = "!,'10000,<1000,s10,h,rterm:,rlean:"
 

@@ -29,7 +29,7 @@ return {
       --   neighbor_float_term(function(focused_index, terminals_number) return focused_index == 1 and terminals_number or focused_index - 1 end)
       -- end
       vim.keymap.set("t", "<C-a><C-d>", "<C-\\><C-n>")
-      vim.keymap.set("t", "<C-a><C-k>", "<C-\\><C-n><C-u>")
+      vim.keymap.set("t", "<C-a><C-k>", "<C-\\><C-n><C-u>M")
       -- vim.keymap.set("<C-d>", open_alt_float_term())
     end,
     opts = {

@@ -5,14 +5,14 @@ return {
       vim.g.vimtex_compiler_latexmk = {
         ['options'] = {
           '-verbose',
-          '-xelatex',
+          -- '-xelatex',
           '-file-line-error',
           '-shell-escape',
           '-synctex=1',
           '-interaction=nonstopmode',
         },
       }
-      vim.g.vimtex_compiler_latexmk_engines = { _ = '-xelatex' }
+      -- vim.g.vimtex_compiler_latexmk_engines = { _ = '-xelatex' }
 
       vim.g.vimtex_view_method = "sioyek"
       vim.g.vimtex_view_enabled = true
@@ -21,6 +21,7 @@ return {
       vim.g.vimtex_quickfix_ignore_filters = {
         'LaTeX Font Warning',
         'Overfull',
+        'I found no'
       }
     end
   },
