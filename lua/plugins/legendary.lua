@@ -24,6 +24,7 @@ return {
       {"<leader>sc", "<Cmd>ToggleTermContextClear<CR>"},
       {"<leader>sl", "<Cmd>ToggleTermLast<CR>"},
       {"<leader>sn", "<Cmd>ToggleTermNew<CR>"},
+      {"<leader>ct", "<Cmd>NvimTreeClose<CR>"},
       -- {"<leader>Tt", "<Cmd>tabnew<CR>"},
       -- {"<leader>pp", '<Cmd>let @" = join(readfile("/home/gcloud/temp"), "\\n")<CR>'},
       -- {"<leader>yy", "<Cmd>call writefile(getreg('\"', 1, 1), \"/home/pugobat11144/temp\", \"S\")<CR>"},
