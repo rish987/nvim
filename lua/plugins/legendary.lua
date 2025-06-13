@@ -18,6 +18,7 @@ return {
       {"<leader>p", "<Cmd>set paste<CR>"},
       {"<leader>P", "<Cmd>set nopaste<CR>"},
       {"<leader>m", "<Cmd>setlo nomodifiable<CR>"},
+      {"<leader><leader>n", "<Cmd>NvimTreeClose<CR>"},
       {"<leader>M", "<Cmd>setlo modifiable<CR>"},
       {"<leader>L", "<Cmd>LspInfo<CR>"},
       {"<leader>R", "<Cmd>LspRestart<CR>"},

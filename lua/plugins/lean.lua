@@ -9,7 +9,7 @@ return {
       return {
         progress_bars = {
           -- Enable the progress bars?
-          enable = false,
+          enable = true,
           -- What character should be used for the bars?
           character = '│',
           -- Use a different priority for the signs
@@ -43,10 +43,14 @@ return {
             -- Clip the infoview to a maximum width
             support_hop = true,
             --width = 120,
-            width = 60,
+            width = 120,
             autoopen = false,
             indicators = "auto",
-            separate_tab = false
+            separate_tab = false,
+            goal_markers = {
+              unsolved = '',
+              accomplished = '',
+            },
         },
         -- Enable the Lean3(lsp3)/Lean4(lsp) language servers?
         --

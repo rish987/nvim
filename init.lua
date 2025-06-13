@@ -65,7 +65,7 @@ require("lazy").setup("plugins",
         -- "hrsh7th/nvim-cmp",
         -- "hrsh7th/cmp-buffer",
         "ggandor/leap.nvim",
-        -- "Julian/lean.nvim",
+        "Julian/lean.nvim",
         -- "jonatan-branting/nvim-better-n",
         "stevearc/overseer.nvim",
         "akinsho/bufferline.nvim",
@@ -221,6 +221,8 @@ end)
 vim.keymap.set("n", "<leader>dt", function ()
   vim.cmd("'<,'>s/dbg_/t/g")
 end)
+
+vim.keymap.set("n", "<leader>I", function () require"lean.infoview".close() require"lean.infoview".open() end)
 
 vim.o.shada = "!,'10000,<1000,s10,h,rterm:,rlean:"
 
