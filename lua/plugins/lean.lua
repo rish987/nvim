@@ -44,6 +44,7 @@ return {
             support_hop = true,
             width = 100,
             -- width = 60,
+            --width = 120,
             autoopen = false,
             indicators = "auto",
             separate_tab = false,
