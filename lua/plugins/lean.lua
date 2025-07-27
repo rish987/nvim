@@ -42,8 +42,8 @@ return {
         infoview = {
             -- Clip the infoview to a maximum width
             support_hop = true,
-            --width = 120,
-            width = 120,
+            width = 100,
+            -- width = 60,
             autoopen = false,
             indicators = "auto",
             separate_tab = false,

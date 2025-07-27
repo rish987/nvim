@@ -64,12 +64,12 @@ require("lazy").setup("plugins",
       patterns = {
         -- "hrsh7th/nvim-cmp",
         -- "hrsh7th/cmp-buffer",
-        "ggandor/leap.nvim",
-        "Julian/lean.nvim",
-        -- "jonatan-branting/nvim-better-n",
-        "stevearc/overseer.nvim",
-        "akinsho/bufferline.nvim",
-        "chrisgrieser/nvim-recorder",
+        --"ggandor/leap.nvim",
+        ---- "Julian/lean.nvim",
+        ---- "jonatan-branting/nvim-better-n",
+        --"stevearc/overseer.nvim",
+        --"akinsho/bufferline.nvim",
+        --"chrisgrieser/nvim-recorder",
       }, -- For example {"folke"}
       fallback = false, -- Fallback to git when local plugin doesn't exist
     },
@@ -222,7 +222,10 @@ vim.keymap.set("n", "<leader>dt", function ()
   vim.cmd("'<,'>s/dbg_/t/g")
 end)
 
-vim.keymap.set("n", "<leader>I", function () require"lean.infoview".close() require"lean.infoview".open() end)
+vim.keymap.set("n", "<leader>b", function () require"lean.infoview".close() vim.wait(1000) require"lean.infoview".open() end)
+vim.keymap.set("n", "<leader>i", function () require"lean.infoview".toggle() end)
+vim.keymap.set("v", "<leader>t", '"t')
+vim.keymap.set("n", "<leader>t", '"t')
 
 vim.o.shada = "!,'10000,<1000,s10,h,rterm:,rlean:"
 
@@ -254,3 +257,9 @@ vim.cmd([[
 
   " nnoremap gp `[v`]
 ]])
+
+-- local info_was_open = false
+-- vim.api.nvim_create_autocmd({"InsertEnter"},
+--   {
+--     callback = function (info) if require("lean").info end,
+--   })
